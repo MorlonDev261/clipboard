@@ -48,9 +48,9 @@ class FolderScreen extends ConsumerWidget {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showCreateFolderDialog(context, ref),
-        icon: const Icon(Icons.create_new_folder_outlined),
-        label: Text(strings.newFolder),
+        onPressed: () => _showAddSheet(context, ref),
+        icon: const Icon(Icons.add),
+        label: Text(strings.add),
       ),
       body: folderAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -71,6 +71,43 @@ class FolderScreen extends ConsumerWidget {
     } else {
       context.go('/');
     }
+  }
+
+  Future<void> _showAddSheet(BuildContext context, WidgetRef ref) async {
+    final strings = ref.read(appStringsProvider);
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.create_new_folder_outlined),
+              title: Text(strings.newFolder),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _showCreateFolderDialog(context, ref);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.notes_outlined),
+              title: Text(strings.createText),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                context.go('/folder/$folderId/new-text');
+              },
+            ),
+            ListTile(
+              enabled: false,
+              leading: const Icon(Icons.perm_media_outlined),
+              title: Text(strings.import),
+              subtitle: Text(strings.mediaComingSoon),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _showCreateFolderDialog(
@@ -165,8 +202,20 @@ class _FolderBody extends ConsumerWidget {
                   for (final a in list)
                     Card(
                       child: ListTile(
-                        leading: const Icon(Icons.description_outlined),
+                        leading: Icon(_iconFor(a.type)),
                         title: Text(a.title ?? a.name),
+                        subtitle: a.type == AssetType.text &&
+                                (a.textContent ?? '').isNotEmpty
+                            ? Text(
+                                a.textContent!,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              )
+                            : null,
+                        trailing: a.isFavorite
+                            ? const Icon(Icons.star, size: 18)
+                            : null,
+                        onTap: () => context.go('/asset/${a.id}'),
                       ),
                     ),
                 ],
@@ -184,7 +233,26 @@ class _FolderBody extends ConsumerWidget {
               children: [
                 for (final a in list)
                   Card(
-                    child: Center(child: Text(a.title ?? a.name)),
+                    child: InkWell(
+                      onTap: () => context.go('/asset/${a.id}'),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(_iconFor(a.type),
+                                color: Theme.of(context).colorScheme.primary),
+                            const Spacer(),
+                            Text(
+                              a.title ?? a.name,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
               ],
             );
@@ -333,4 +401,19 @@ void _showSnack(BuildContext context, String message) {
   ScaffoldMessenger.of(context)
     ..clearSnackBars()
     ..showSnackBar(SnackBar(content: Text(message)));
+}
+
+IconData _iconFor(AssetType type) {
+  switch (type) {
+    case AssetType.text:
+      return Icons.description_outlined;
+    case AssetType.image:
+      return Icons.image_outlined;
+    case AssetType.video:
+      return Icons.videocam_outlined;
+    case AssetType.link:
+      return Icons.link_outlined;
+    case AssetType.post:
+      return Icons.dynamic_feed_outlined;
+  }
 }

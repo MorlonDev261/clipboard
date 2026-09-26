@@ -24,6 +24,7 @@ class AppStrings {
   String get favorites => _t('Favoris', 'Favorites');
 
   // Actions
+  String get add => _t('Ajouter', 'Add');
   String get newFolder => _t('Nouveau dossier', 'New folder');
   String get import => _t('Importer', 'Import');
   String get createText => _t('Créer un texte', 'Create text');
@@ -37,6 +38,39 @@ class AppStrings {
   String get create => _t('Créer', 'Create');
   String get save => _t('Enregistrer', 'Save');
   String get open => _t('Ouvrir', 'Open');
+  String get edit => _t('Modifier', 'Edit');
+
+  // Text asset / create
+  String get createTextTitle => _t('Nouveau texte', 'New text');
+  String get editTextTitle => _t('Modifier le texte', 'Edit text');
+  String get titleOptionalLabel => _t('Titre (optionnel)', 'Title (optional)');
+  String get textLabel => _t('Texte', 'Text');
+  String get statusLabel => _t('Statut', 'Status');
+  String get statusDraft => _t('Brouillon', 'Draft');
+  String get statusReady => _t('Prêt', 'Ready');
+  String get textEmptyError =>
+      _t('Le texte ne peut pas être vide.', 'The text cannot be empty.');
+  String get copyText => _t('Copier le texte', 'Copy text');
+  String get copyTitleAndText =>
+      _t('Copier le titre et le texte', 'Copy title and text');
+  String get copiedToClipboard =>
+      _t('Copié dans le presse-papiers', 'Copied to clipboard');
+  String get addToFavorites => _t('Ajouter aux favoris', 'Add to favorites');
+  String get removeFromFavorites =>
+      _t('Retirer des favoris', 'Remove from favorites');
+  String get deleteAssetTitle => _t('Supprimer ce contenu ?', 'Delete this content?');
+  String get deleteAssetMessage => _t(
+        'Ce contenu sera déplacé vers la corbeille.',
+        'This content will be moved to the trash.',
+      );
+  String get contentDeleted => _t('Contenu supprimé.', 'Content deleted.');
+  String get textSaved => _t('Texte enregistré.', 'Text saved.');
+  String get mediaComingSoon => _t(
+        'L\'import de médias arrive bientôt.',
+        'Media import is coming soon.',
+      );
+  String get importImages => _t('Importer des images', 'Import images');
+  String get importVideos => _t('Importer des vidéos', 'Import videos');
 
   // Content categories
   String get images => _t('Images', 'Images');
