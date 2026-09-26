@@ -1,68 +1,41 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/constants/app_constants.dart';
+import '../../../app/nav.dart';
 import '../../../core/l10n/app_strings.dart';
-import '../../folders/application/folders_providers.dart';
-import '../application/home_providers.dart';
+import '../../../core/providers/workspace_providers.dart';
+import '../../library/application/library_providers.dart';
+import '../../library/domain/library_entry.dart';
 
-/// Landing screen: quick stats, the "Main" entry point and recent folders.
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
+
+  Future<void> _pickWorkspace(WidgetRef ref) async {
+    final dir = await FilePicker.platform.getDirectoryPath();
+    if (dir != null) {
+      await ref.read(workspaceControllerProvider.notifier).setRoot(dir);
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final strings = ref.watch(appStringsProvider);
-    final rootFolder = ref.watch(rootFolderProvider);
+    final workspace = ref.watch(workspaceControllerProvider);
 
     return Scaffold(
       appBar: AppBar(title: Text(strings.appName)),
       body: Center(
         child: ConstrainedBox(
-          constraints:
-              const BoxConstraints(maxWidth: AppConstants.maxContentWidth),
-          child: RefreshIndicator(
-            onRefresh: () async {
-              ref.invalidate(dashboardStatsProvider);
-              ref.invalidate(rootFolderProvider);
-            },
-            child: ListView(
-              padding: const EdgeInsets.all(AppConstants.defaultPadding),
-              children: [
-                _SearchField(
-                  hint: strings.searchHint,
-                  onTap: () => context.go('/search'),
-                ),
-                const SizedBox(height: 24),
-                Text(strings.quickStats,
-                    style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: 12),
-                const _StatsGrid(),
-                const SizedBox(height: 24),
-                rootFolder.when(
-                  loading: () => const Center(
-                      child: Padding(
-                    padding: EdgeInsets.all(24),
-                    child: CircularProgressIndicator(),
-                  )),
-                  error: (e, _) => Text(strings.genericError),
-                  data: (folder) => FilledButton.icon(
-                    onPressed: () => context.go('/folder/${folder.id}'),
-                    icon: const Icon(Icons.folder_open),
-                    label: Text(strings.openMain),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Text(strings.recentFolders,
-                    style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: 12),
-                rootFolder.maybeWhen(
-                  data: (folder) => _RecentFolders(parentId: folder.id),
-                  orElse: () => const SizedBox.shrink(),
-                ),
-              ],
-            ),
+          constraints: const BoxConstraints(maxWidth: AppConstants.maxContentWidth),
+          child: workspace.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Center(child: Text(strings.genericError)),
+            data: (root) => root == null
+                ? _ChooseWorkspace(onPick: () => _pickWorkspace(ref))
+                : _Dashboard(root: root),
           ),
         ),
       ),
@@ -70,43 +43,97 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
-class _SearchField extends StatelessWidget {
-  const _SearchField({required this.hint, required this.onTap});
+class _ChooseWorkspace extends ConsumerWidget {
+  const _ChooseWorkspace({required this.onPick});
 
-  final String hint;
-  final VoidCallback onTap;
+  final VoidCallback onPick;
 
   @override
-  Widget build(BuildContext context) {
-    return TextField(
-      readOnly: true,
-      onTap: onTap,
-      decoration: InputDecoration(
-        hintText: hint,
-        prefixIcon: const Icon(Icons.search),
+  Widget build(BuildContext context, WidgetRef ref) {
+    final strings = ref.watch(appStringsProvider);
+    return Padding(
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.folder_special_outlined,
+              size: 64, color: Theme.of(context).colorScheme.primary),
+          const SizedBox(height: 16),
+          Text(strings.chooseWorkspace,
+              style: Theme.of(context).textTheme.titleLarge,
+              textAlign: TextAlign.center),
+          const SizedBox(height: 8),
+          Text(strings.workspaceIntro,
+              style: Theme.of(context).textTheme.bodyMedium,
+              textAlign: TextAlign.center),
+          const SizedBox(height: 24),
+          FilledButton.icon(
+            onPressed: onPick,
+            icon: const Icon(Icons.drive_folder_upload_outlined),
+            label: Text(strings.chooseWorkspace),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _StatsGrid extends ConsumerWidget {
-  const _StatsGrid();
+class _Dashboard extends ConsumerWidget {
+  const _Dashboard({required this.root});
+
+  final String root;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final strings = ref.watch(appStringsProvider);
-    final stats = ref.watch(dashboardStatsProvider);
-    final width = MediaQuery.sizeOf(context).width;
-    final columns = width >= AppConstants.desktopBreakpoint ? 4 : 2;
+    final listing = ref.watch(directoryProvider(root));
 
-    final data = stats.valueOrNull;
-    final items = <(_StatKind, IconData, String, int?)>[
-      (_StatKind.images, Icons.image_outlined, strings.images, data?.images),
-      (_StatKind.videos, Icons.videocam_outlined, strings.videos, data?.videos),
-      (_StatKind.texts, Icons.notes_outlined, strings.texts, data?.texts),
-      (_StatKind.posts, Icons.dynamic_feed_outlined, strings.posts, data?.posts),
+    return ListView(
+      padding: const EdgeInsets.all(AppConstants.defaultPadding),
+      children: [
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.folder_open),
+            title: Text(strings.workspaceFolder),
+            subtitle: Text(root),
+          ),
+        ),
+        const SizedBox(height: 16),
+        FilledButton.icon(
+          onPressed: () => context.push(browseRoute(root)),
+          icon: const Icon(Icons.grid_view_rounded),
+          label: Text(strings.openLibrary),
+        ),
+        const SizedBox(height: 24),
+        Text(strings.contents, style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 12),
+        listing.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => Text(strings.genericError),
+          data: (entries) => _StatsRow(entries: entries),
+        ),
+      ],
+    );
+  }
+}
+
+class _StatsRow extends ConsumerWidget {
+  const _StatsRow({required this.entries});
+
+  final List<LibraryEntry> entries;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final strings = ref.watch(appStringsProvider);
+    int count(bool Function(LibraryEntry) test) => entries.where(test).length;
+    final items = <(IconData, String, int)>[
+      (Icons.folder_outlined, strings.folders, count((e) => e.isFolder)),
+      (Icons.image_outlined, strings.images, count((e) => e.isImage)),
+      (Icons.videocam_outlined, strings.videos, count((e) => e.isVideo)),
+      (Icons.notes_outlined, strings.notes, count((e) => e.isNote)),
     ];
-
+    final columns =
+        MediaQuery.sizeOf(context).width >= AppConstants.desktopBreakpoint ? 4 : 2;
     return GridView.count(
       crossAxisCount: columns,
       shrinkWrap: true,
@@ -115,81 +142,27 @@ class _StatsGrid extends ConsumerWidget {
       crossAxisSpacing: 12,
       childAspectRatio: 1.8,
       children: [
-        for (final (_, icon, label, value) in items)
-          _StatCard(icon: icon, label: label, value: value),
-      ],
-    );
-  }
-}
-
-enum _StatKind { images, videos, texts, posts }
-
-class _StatCard extends StatelessWidget {
-  const _StatCard({required this.icon, required this.label, this.value});
-
-  final IconData icon;
-  final String label;
-  final int? value;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: theme.colorScheme.primary),
-            const SizedBox(height: 8),
-            Text(
-              value?.toString() ?? '—',
-              style: theme.textTheme.headlineSmall
-                  ?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            Text(label, style: theme.textTheme.bodySmall),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _RecentFolders extends ConsumerWidget {
-  const _RecentFolders({required this.parentId});
-
-  final String parentId;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final strings = ref.watch(appStringsProvider);
-    final folders = ref.watch(childFoldersProvider(parentId));
-
-    return folders.when(
-      loading: () => const SizedBox.shrink(),
-      error: (e, _) => Text(strings.genericError),
-      data: (list) {
-        if (list.isEmpty) {
-          return Text(
-            strings.noSubfolders,
-            style: Theme.of(context).textTheme.bodyMedium,
-          );
-        }
-        return Column(
-          children: [
-            for (final folder in list.take(6))
-              Card(
-                child: ListTile(
-                  leading: const Icon(Icons.folder_outlined),
-                  title: Text(folder.name),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => context.go('/folder/${folder.id}'),
-                ),
+        for (final (icon, label, value) in items)
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, color: Theme.of(context).colorScheme.primary),
+                  const SizedBox(height: 8),
+                  Text('$value',
+                      style: Theme.of(context)
+                          .textTheme
+                          .headlineSmall
+                          ?.copyWith(fontWeight: FontWeight.bold)),
+                  Text(label, style: Theme.of(context).textTheme.bodySmall),
+                ],
               ),
-          ],
-        );
-      },
+            ),
+          ),
+      ],
     );
   }
 }

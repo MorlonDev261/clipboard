@@ -1,10 +1,9 @@
 import 'package:clipboard/core/l10n/app_strings.dart';
-import 'package:clipboard/features/folders/domain/folder.dart';
+import 'package:clipboard/features/library/domain/library_entry.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-// Lightweight, dependency-free tests that do not touch the database.
-// Widget/integration tests that boot the full app arrive in a later milestone.
+// Lightweight, dependency-free tests (no filesystem, no UI boot).
 void main() {
   group('AppStrings', () {
     test('defaults to French', () {
@@ -20,27 +19,35 @@ void main() {
     });
   });
 
-  group('Folder', () {
-    final now = DateTime(2026);
-    final folder = Folder(
-      id: 'f1',
-      name: 'Main',
-      isRoot: true,
-      createdAt: now,
-      updatedAt: now,
-    );
-
-    test('copyWith updates the name and keeps identity', () {
-      final renamed = folder.copyWith(name: 'Renamed');
-      expect(renamed.name, 'Renamed');
-      expect(renamed.id, folder.id);
-      expect(renamed == folder, isTrue); // equality is by id
+  group('kindForFile', () {
+    test('classifies by extension', () {
+      expect(kindForFile('photo.JPG'), EntryKind.image);
+      expect(kindForFile('clip.mp4'), EntryKind.video);
+      expect(kindForFile('note.md'), EntryKind.note);
+      expect(kindForFile('archive.zip'), EntryKind.other);
     });
+  });
 
-    test('isDeleted reflects deletedAt', () {
-      expect(folder.isDeleted, isFalse);
-      final deleted = folder.copyWith(deletedAt: () => now);
-      expect(deleted.isDeleted, isTrue);
+  group('LibraryEntry', () {
+    test('displayName strips the .md extension for notes', () {
+      final note = LibraryEntry(
+        path: '/lib/hello.md',
+        name: 'hello.md',
+        kind: EntryKind.note,
+        size: 12,
+        modified: DateTime(2026),
+      );
+      expect(note.displayName, 'hello');
+
+      final image = LibraryEntry(
+        path: '/lib/pic.png',
+        name: 'pic.png',
+        kind: EntryKind.image,
+        size: 1000,
+        modified: DateTime(2026),
+      );
+      expect(image.displayName, 'pic.png');
+      expect(image.isMedia, isTrue);
     });
   });
 }

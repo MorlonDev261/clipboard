@@ -1,17 +1,17 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../features/assets/presentation/asset_detail_screen.dart';
-import '../features/assets/presentation/create_text_screen.dart';
-import '../features/folders/presentation/folder_screen.dart';
 import '../features/home/presentation/home_screen.dart';
+import '../features/library/presentation/browse_screen.dart';
+import '../features/library/presentation/note_screen.dart';
+import '../features/library/presentation/preview_screen.dart';
 import '../features/search/presentation/search_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
 import '../features/trash/presentation/trash_screen.dart';
 import 'widgets/app_shell.dart';
 
-/// Application router. All primary destinations are wrapped in [AppShell],
-/// which provides the responsive sidebar / bottom navigation.
+/// Application router. Filesystem paths travel as the `path` / `dir` query
+/// parameter (they contain slashes, so they can't be path segments).
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: '/',
@@ -25,26 +25,33 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const HomeScreen(),
           ),
           GoRoute(
-            path: '/folder/:id',
-            builder: (context, state) =>
-                FolderScreen(folderId: state.pathParameters['id']!),
+            path: '/browse',
+            builder: (context, state) {
+              final path = state.uri.queryParameters['path'];
+              if (path == null) return const HomeScreen();
+              return BrowseScreen(dirPath: path);
+            },
           ),
           GoRoute(
-            path: '/folder/:id/new-text',
-            builder: (context, state) =>
-                CreateTextScreen(folderId: state.pathParameters['id']!),
+            path: '/note',
+            builder: (context, state) {
+              final q = state.uri.queryParameters;
+              if (q['path'] == null && q['dir'] == null) {
+                return const HomeScreen();
+              }
+              return NoteScreen(
+                existingPath: q['path'],
+                newDir: q['dir'],
+              );
+            },
           ),
           GoRoute(
-            path: '/folder/:id/edit-text/:assetId',
-            builder: (context, state) => CreateTextScreen(
-              folderId: state.pathParameters['id']!,
-              assetId: state.pathParameters['assetId'],
-            ),
-          ),
-          GoRoute(
-            path: '/asset/:assetId',
-            builder: (context, state) =>
-                AssetDetailScreen(assetId: state.pathParameters['assetId']!),
+            path: '/preview',
+            builder: (context, state) {
+              final path = state.uri.queryParameters['path'];
+              if (path == null) return const HomeScreen();
+              return PreviewScreen(path: path);
+            },
           ),
           GoRoute(
             path: '/search',
