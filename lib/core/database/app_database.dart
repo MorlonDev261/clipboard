@@ -2,6 +2,9 @@ import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
 import 'package:uuid/uuid.dart';
 
+// The generated part (app_database.g.dart) references these enum types, so the
+// enclosing library must import them here (imports are not transitive).
+import '../../shared/enums/enums.dart';
 import 'tables.dart';
 
 part 'app_database.g.dart';
