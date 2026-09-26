@@ -74,6 +74,10 @@ class AppStrings {
   String get copyContent => _t('Copier le contenu', 'Copy content');
   String get emptyNoteError =>
       _t('La note ne peut pas être vide.', 'The note cannot be empty.');
+  String get attachPhoto => _t('Joindre une photo', 'Attach a photo');
+  String get attachments => _t('Pièces jointes', 'Attachments');
+  String photosAttached(int n) =>
+      _t('$n photo(s) jointe(s).', '$n photo(s) attached.');
 
   // Dialogs
   String get nameLabel => _t('Nom', 'Name');

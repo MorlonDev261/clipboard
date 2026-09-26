@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path/path.dart' as p;
 
 import '../../../core/providers/workspace_providers.dart';
 import '../../../shared/enums/enums.dart';
@@ -128,6 +129,13 @@ class LibraryController {
   }
 
   Future<String> readNote(String path) => _repo.readTextFile(path);
+
+  /// Copies [sourcePath] into the note folder's `.attachments` and returns the
+  /// Markdown-friendly relative link to embed in a note living in [dirPath].
+  Future<String> attachImage(String dirPath, String sourcePath) async {
+    final abs = await _repo.attachImageToDir(dirPath, sourcePath);
+    return p.relative(abs, from: dirPath).replaceAll(r'\', '/');
+  }
 
   Future<void> saveNote(String path, String content) =>
       _repo.writeTextFile(path, content);

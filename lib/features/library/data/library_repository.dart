@@ -160,6 +160,17 @@ class LibraryRepository {
     return file.path;
   }
 
+  /// Copies an image into a hidden `.attachments` folder next to notes in
+  /// [dirPath] and returns its absolute path. Hidden, so it never clutters the
+  /// folder listing or stats.
+  Future<String> attachImageToDir(String dirPath, String sourcePath) async {
+    final attachDir = Directory(p.join(dirPath, '.attachments'));
+    await attachDir.create(recursive: true);
+    final target = _uniquePath(p.join(attachDir.path, p.basename(sourcePath)));
+    await File(sourcePath).copy(target);
+    return target;
+  }
+
   Future<String> readTextFile(String path) => File(path).readAsString();
 
   Future<void> writeTextFile(String path, String content) =>
