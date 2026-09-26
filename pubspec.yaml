@@ -38,11 +38,11 @@ dependencies:
   share_plus: ^10.1.3
   video_player: ^2.9.2
 
-  # Reserved for future secrets (auth / sync)
-  flutter_secure_storage: ^9.2.2
-
-  # Permissions (used only where required)
-  permission_handler: ^11.3.1
+  # NOTE: flutter_secure_storage (future secrets) and permission_handler
+  # (runtime permissions) are intentionally NOT added yet — they pull in
+  # native code that is unused by the current MVP and breaks the Windows
+  # build on recent MSVC toolchains. They will be re-added, at compatible
+  # versions, in the milestone that actually needs them.
 
   # Utilities
   intl: any
