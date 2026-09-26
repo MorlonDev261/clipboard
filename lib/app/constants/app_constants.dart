@@ -1,0 +1,25 @@
+/// App-wide constants and configurable defaults.
+abstract final class AppConstants {
+  static const String appName = 'Clipboard';
+
+  /// Layout breakpoint (logical pixels) above which the desktop / tablet
+  /// layout (persistent sidebar, wider grids) is used.
+  static const double desktopBreakpoint = 840;
+
+  /// Maximum content width on large screens.
+  static const double maxContentWidth = 1200;
+
+  static const double defaultPadding = 16;
+  static const double borderRadius = 16;
+
+  /// Search input debounce.
+  static const Duration searchDebounce = Duration(milliseconds: 300);
+
+  // Default file-size limits (bytes). Overridable from settings.
+  static const int maxImageBytes = 100 * 1024 * 1024; // 100 MB
+  static const int maxVideoBytes = 1024 * 1024 * 1024; // 1 GB
+  static const int maxTextBytes = 1 * 1024 * 1024; // 1 MB
+
+  static const List<String> imageExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+  static const List<String> videoExtensions = ['mp4', 'mov', 'webm', 'avi'];
+}
