@@ -60,7 +60,10 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
           IconButton(
             tooltip: strings.refresh,
             icon: const Icon(Icons.refresh),
-            onPressed: () => ref.invalidate(directoryProvider(_dir)),
+            onPressed: () {
+              ref.invalidate(directoryProvider(_dir));
+              ref.invalidate(dirStatsProvider(_dir));
+            },
           ),
           IconButton(
             tooltip: strings.contents,
@@ -94,6 +97,7 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
             Column(
               children: [
                 if (root != null) _Breadcrumb(root: root, dir: _dir),
+                _StatsCards(dir: _dir),
                 _FilterBar(),
                 Expanded(
                   child: listing.when(
@@ -261,6 +265,66 @@ class _SortMenu extends ConsumerWidget {
         for (final o in SortOption.values)
           PopupMenuItem(value: o, child: Text(label(o))),
       ],
+    );
+  }
+}
+
+/// Dynamic stat cards for the current folder (recursive: folder + subfolders).
+class _StatsCards extends ConsumerWidget {
+  const _StatsCards({required this.dir});
+
+  final String dir;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final strings = ref.watch(appStringsProvider);
+    final stats = ref.watch(dirStatsProvider(dir)).valueOrNull;
+    final items = <(IconData, String, int?)>[
+      (Icons.folder_outlined, strings.folders, stats?.folders),
+      (Icons.image_outlined, strings.images, stats?.images),
+      (Icons.videocam_outlined, strings.videos, stats?.videos),
+      (Icons.notes_outlined, strings.notes, stats?.notes),
+    ];
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+      child: Row(
+        children: [
+          for (final (icon, label, value) in items)
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Card(
+                  margin: EdgeInsets.zero,
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                    child: Column(
+                      children: [
+                        Icon(icon,
+                            size: 20,
+                            color: Theme.of(context).colorScheme.primary),
+                        const SizedBox(height: 4),
+                        Text(
+                          value?.toString() ?? '—',
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.labelSmall,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

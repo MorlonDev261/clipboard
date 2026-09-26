@@ -68,6 +68,22 @@ final favoritesProvider = FutureProvider<List<LibraryEntry>>((ref) async {
   return all.where((e) => e.isFavorite).toList();
 });
 
+/// Recursive counts for a folder (the folder itself + all sub-folders).
+typedef DirStats = ({int folders, int images, int videos, int notes});
+
+final dirStatsProvider =
+    FutureProvider.family<DirStats, String>((ref, dirPath) async {
+  final repo = ref.watch(libraryRepositoryProvider);
+  if (repo == null) return (folders: 0, images: 0, videos: 0, notes: 0);
+  final all = await repo.listAllUnder(dirPath);
+  return (
+    folders: all.where((e) => e.isFolder).length,
+    images: all.where((e) => e.isImage).length,
+    videos: all.where((e) => e.isVideo).length,
+    notes: all.where((e) => e.isNote).length,
+  );
+});
+
 /// Controller for library mutations. Callers pass the directory that should be
 /// refreshed so metadata-only changes (which don't trigger the fs watcher)
 /// still update the UI.
@@ -88,7 +104,10 @@ class LibraryController {
     return repo;
   }
 
-  void _touchIndex() => _ref.invalidate(libraryIndexProvider);
+  void _touchIndex() {
+    _ref.invalidate(libraryIndexProvider);
+    _ref.invalidate(dirStatsProvider); // refresh all folder stat cards
+  }
 
   Future<String> createFolder(String parentPath, String name) async {
     final path = await _repo.createFolder(parentPath, name);

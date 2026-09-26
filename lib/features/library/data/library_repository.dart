@@ -76,10 +76,13 @@ class LibraryRepository {
 
   /// Recursively lists every entry under the workspace root (skipping hidden
   /// directories such as `.clipboard`). Used by search and favorites.
-  Future<List<LibraryEntry>> listAllEntries() async {
+  Future<List<LibraryEntry>> listAllEntries() => listAllUnder(root);
+
+  /// Recursively lists every entry under [dirPath] (used for folder stats).
+  Future<List<LibraryEntry>> listAllUnder(String dirPath) async {
     final meta = await _metadata.load();
     final out = <LibraryEntry>[];
-    await _walk(Directory(root), meta, out);
+    await _walk(Directory(dirPath), meta, out);
     return out;
   }
 
