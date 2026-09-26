@@ -74,6 +74,61 @@ class LibraryRepository {
     return entries;
   }
 
+  /// Recursively lists every entry under the workspace root (skipping hidden
+  /// directories such as `.clipboard`). Used by search and favorites.
+  Future<List<LibraryEntry>> listAllEntries() async {
+    final meta = await _metadata.load();
+    final out = <LibraryEntry>[];
+    await _walk(Directory(root), meta, out);
+    return out;
+  }
+
+  Future<void> _walk(
+    Directory dir,
+    Map<String, EntryMeta> meta,
+    List<LibraryEntry> out,
+  ) async {
+    List<FileSystemEntity> children;
+    try {
+      children = await dir.list(followLinks: false).toList();
+    } catch (_) {
+      return;
+    }
+    for (final ent in children) {
+      final name = p.basename(ent.path);
+      if (name.startsWith('.')) continue;
+      FileStat stat;
+      try {
+        stat = await ent.stat();
+      } catch (_) {
+        continue;
+      }
+      final m = meta[_metadata.relKey(ent.path)];
+      if (ent is Directory) {
+        out.add(LibraryEntry(
+          path: ent.path,
+          name: name,
+          kind: EntryKind.folder,
+          size: 0,
+          modified: stat.modified,
+          isFavorite: m?.favorite ?? false,
+          tags: m?.tags ?? const [],
+        ));
+        await _walk(ent, meta, out);
+      } else if (ent is File) {
+        out.add(LibraryEntry(
+          path: ent.path,
+          name: name,
+          kind: kindForFile(name),
+          size: stat.size,
+          modified: stat.modified,
+          isFavorite: m?.favorite ?? false,
+          tags: m?.tags ?? const [],
+        ));
+      }
+    }
+  }
+
   // --- Create ----------------------------------------------------------------
 
   Future<String> createFolder(String parentPath, String name) async {
@@ -132,10 +187,40 @@ class LibraryRepository {
     return renamed.path;
   }
 
-  // --- Favorites -------------------------------------------------------------
+  // --- Favorites / tags ------------------------------------------------------
 
   Future<void> setFavorite(String path, bool value) =>
       _metadata.setFavorite(path, value);
+
+  Future<void> setTags(String path, List<String> tags) =>
+      _metadata.setTags(path, tags);
+
+  // --- Move / duplicate ------------------------------------------------------
+
+  Future<String> move(String path, String destDir) async {
+    final target = _uniquePath(p.join(destDir, p.basename(path)));
+    final isDir = await FileSystemEntity.isDirectory(path);
+    final result = isDir
+        ? await Directory(path).rename(target)
+        : await File(path).rename(target);
+    await _metadata.move(path, result.path);
+    return result.path;
+  }
+
+  Future<String> duplicate(String path) async {
+    final parent = p.dirname(path);
+    final isDir = await FileSystemEntity.isDirectory(path);
+    if (isDir) {
+      final target = _uniquePath(p.join(parent, '${p.basename(path)} (copie)'));
+      await _copyDirectory(path, target);
+      return target;
+    }
+    final base = p.basenameWithoutExtension(path);
+    final ext = p.extension(path);
+    final target = _uniquePath(p.join(parent, '$base (copie)$ext'));
+    await File(path).copy(target);
+    return target;
+  }
 
   // --- Import (copy into the workspace) --------------------------------------
 

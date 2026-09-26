@@ -22,15 +22,17 @@ class AppShell extends ConsumerWidget {
   static const _destinations = <_Destination>[
     _Destination('/', Icons.home_outlined, Icons.home),
     _Destination('/search', Icons.search_outlined, Icons.search),
+    _Destination('/favorites', Icons.star_border, Icons.star),
     _Destination('/trash', Icons.delete_outline, Icons.delete),
     _Destination('/settings', Icons.settings_outlined, Icons.settings),
   ];
 
   int get _selectedIndex {
-    // Folder routes belong to the "home" tab.
+    // Browse / note / preview routes belong to the "home" tab.
     if (location.startsWith('/search')) return 1;
-    if (location.startsWith('/trash')) return 2;
-    if (location.startsWith('/settings')) return 3;
+    if (location.startsWith('/favorites')) return 2;
+    if (location.startsWith('/trash')) return 3;
+    if (location.startsWith('/settings')) return 4;
     return 0;
   }
 
@@ -44,6 +46,7 @@ class AppShell extends ConsumerWidget {
     final labels = [
       strings.home,
       strings.search,
+      strings.favorites,
       strings.trash,
       strings.settings,
     ];

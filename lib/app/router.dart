@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../features/favorites/presentation/favorites_screen.dart';
 import '../features/home/presentation/home_screen.dart';
 import '../features/library/presentation/browse_screen.dart';
 import '../features/library/presentation/note_screen.dart';
@@ -56,6 +57,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/search',
             builder: (context, state) => const SearchScreen(),
+          ),
+          GoRoute(
+            path: '/favorites',
+            builder: (context, state) => const FavoritesScreen(),
           ),
           GoRoute(
             path: '/trash',

@@ -3,10 +3,17 @@ import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/providers/workspace_providers.dart';
+import '../../../shared/enums/enums.dart';
 import '../data/library_repository.dart';
 import '../data/metadata_store.dart';
 import '../data/trash_store.dart';
 import '../domain/library_entry.dart';
+
+/// Active sort order in the browser (session state).
+final browseSortProvider = StateProvider<SortOption>((ref) => SortOption.nameAsc);
+
+/// Active kind filter in the browser; null means "all" (session state).
+final browseFilterProvider = StateProvider<EntryKind?>((ref) => null);
 
 /// The filesystem repository bound to the current workspace, or null if no
 /// workspace has been chosen yet.
@@ -47,6 +54,20 @@ final trashProvider = FutureProvider.autoDispose<List<TrashEntry>>((ref) async {
   return repo.listTrash();
 });
 
+/// Flat, recursive index of every entry in the workspace (for search &
+/// favorites). Kept alive so it isn't rebuilt on every keystroke.
+final libraryIndexProvider = FutureProvider<List<LibraryEntry>>((ref) async {
+  final repo = ref.watch(libraryRepositoryProvider);
+  if (repo == null) return const [];
+  return repo.listAllEntries();
+});
+
+/// All favorite entries across the workspace.
+final favoritesProvider = FutureProvider<List<LibraryEntry>>((ref) async {
+  final all = await ref.watch(libraryIndexProvider.future);
+  return all.where((e) => e.isFavorite).toList();
+});
+
 /// Controller for library mutations. Callers pass the directory that should be
 /// refreshed so metadata-only changes (which don't trigger the fs watcher)
 /// still update the UI.
@@ -67,9 +88,12 @@ class LibraryController {
     return repo;
   }
 
+  void _touchIndex() => _ref.invalidate(libraryIndexProvider);
+
   Future<String> createFolder(String parentPath, String name) async {
     final path = await _repo.createFolder(parentPath, name);
     _ref.invalidate(directoryProvider(parentPath));
+    _touchIndex();
     return path;
   }
 
@@ -80,6 +104,7 @@ class LibraryController {
   }) async {
     final path = await _repo.createNote(dirPath, title: title, content: content);
     _ref.invalidate(directoryProvider(dirPath));
+    _touchIndex();
     return path;
   }
 
@@ -91,30 +116,54 @@ class LibraryController {
   Future<String> rename(String path, String newName, {String? parentDir}) async {
     final result = await _repo.rename(path, newName);
     if (parentDir != null) _ref.invalidate(directoryProvider(parentDir));
+    _touchIndex();
     return result;
   }
 
   Future<void> setFavorite(String path, bool value, {String? parentDir}) async {
     await _repo.setFavorite(path, value);
     if (parentDir != null) _ref.invalidate(directoryProvider(parentDir));
+    _touchIndex();
+  }
+
+  Future<void> setTags(String path, List<String> tags, {String? parentDir}) async {
+    await _repo.setTags(path, tags);
+    if (parentDir != null) _ref.invalidate(directoryProvider(parentDir));
+    _touchIndex();
   }
 
   Future<List<String>> importPaths(
       String destDir, List<String> sourcePaths) async {
     final failed = await _repo.importPaths(destDir, sourcePaths);
     _ref.invalidate(directoryProvider(destDir));
+    _touchIndex();
     return failed;
+  }
+
+  Future<void> move(String path, String destDir, {String? parentDir}) async {
+    await _repo.move(path, destDir);
+    if (parentDir != null) _ref.invalidate(directoryProvider(parentDir));
+    _ref.invalidate(directoryProvider(destDir));
+    _touchIndex();
+  }
+
+  Future<void> duplicate(String path, {String? parentDir}) async {
+    await _repo.duplicate(path);
+    if (parentDir != null) _ref.invalidate(directoryProvider(parentDir));
+    _touchIndex();
   }
 
   Future<void> moveToTrash(String path, {String? parentDir}) async {
     await _repo.moveToTrash(path);
     if (parentDir != null) _ref.invalidate(directoryProvider(parentDir));
     _ref.invalidate(trashProvider);
+    _touchIndex();
   }
 
   Future<void> restoreFromTrash(String id) async {
     await _repo.restoreFromTrash(id);
     _ref.invalidate(trashProvider);
+    _touchIndex();
   }
 
   Future<void> deleteForever(String id) async {

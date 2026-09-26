@@ -10,15 +10,15 @@ import 'package:path/path.dart' as p;
 import '../../../app/constants/app_constants.dart';
 import '../../../app/nav.dart';
 import '../../../core/l10n/app_strings.dart';
+import '../../../core/providers/settings_providers.dart';
 import '../../../core/providers/workspace_providers.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../../shared/enums/enums.dart';
-import '../../../shared/providers/ui_providers.dart';
 import '../application/library_providers.dart';
 import '../domain/library_entry.dart';
 
-/// Browses a real directory on disk: subfolders + files, with create, import,
-/// drag & drop, and per-entry actions.
+/// Browses a real directory on disk: subfolders + files, with breadcrumb,
+/// sort, filters, create, import, drag & drop and per-entry actions.
 class BrowseScreen extends ConsumerStatefulWidget {
   const BrowseScreen({required this.dirPath, super.key});
 
@@ -39,13 +39,16 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
     final root = ref.watch(workspaceRootProvider);
     final isRoot = root != null && p.equals(root, _dir);
     final listing = ref.watch(directoryProvider(_dir));
-    final viewMode = ref.watch(viewModeProvider);
+    final viewMode = ref.watch(settingsProvider).viewMode;
+    final sort = ref.watch(browseSortProvider);
+    final filter = ref.watch(browseFilterProvider);
 
     return Scaffold(
       appBar: AppBar(
         leading: BackButton(onPressed: () => _back(context)),
         title: Text(isRoot ? strings.library : p.basename(_dir)),
         actions: [
+          _SortMenu(),
           IconButton(
             tooltip: strings.refresh,
             icon: const Icon(Icons.refresh),
@@ -56,8 +59,9 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
             icon: Icon(viewMode == ViewMode.grid
                 ? Icons.view_list_outlined
                 : Icons.grid_view_outlined),
-            onPressed: () => ref.read(viewModeProvider.notifier).state =
-                viewMode == ViewMode.grid ? ViewMode.list : ViewMode.grid,
+            onPressed: () => ref.read(settingsControllerProvider.notifier)
+                .setViewMode(
+                    viewMode == ViewMode.grid ? ViewMode.list : ViewMode.grid),
           ),
         ],
       ),
@@ -79,13 +83,26 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
         },
         child: Stack(
           children: [
-            listing.when(
-              loading: () =>
-                  const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text(strings.genericError)),
-              data: (entries) => entries.isEmpty
-                  ? _EmptyBrowse(dropping: _dragging)
-                  : _EntryView(dir: _dir, entries: entries, viewMode: viewMode),
+            Column(
+              children: [
+                if (root != null) _Breadcrumb(root: root, dir: _dir),
+                _FilterBar(),
+                Expanded(
+                  child: listing.when(
+                    loading: () =>
+                        const Center(child: CircularProgressIndicator()),
+                    error: (e, _) => Center(child: Text(strings.genericError)),
+                    data: (entries) {
+                      final visible = _applySortFilter(entries, sort, filter);
+                      if (visible.isEmpty) {
+                        return _EmptyBrowse(dropping: _dragging);
+                      }
+                      return _EntryView(
+                          dir: _dir, entries: visible, viewMode: viewMode);
+                    },
+                  ),
+                ),
+              ],
             ),
             if (_dragging) _DropOverlay(label: strings.dropToImport),
           ],
@@ -186,6 +203,141 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
   }
 }
 
+List<LibraryEntry> _applySortFilter(
+    List<LibraryEntry> entries, SortOption sort, EntryKind? filter) {
+  var list = entries;
+  if (filter != null) {
+    list = list.where((e) => e.kind == filter).toList();
+  }
+  final sorted = [...list];
+  int name(LibraryEntry a, LibraryEntry b) =>
+      a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase());
+  sorted.sort((a, b) {
+    if (a.isFolder != b.isFolder) return a.isFolder ? -1 : 1;
+    switch (sort) {
+      case SortOption.nameAsc:
+        return name(a, b);
+      case SortOption.nameDesc:
+        return name(b, a);
+      case SortOption.newest:
+        return b.modified.compareTo(a.modified);
+      case SortOption.oldest:
+        return a.modified.compareTo(b.modified);
+      case SortOption.sizeAsc:
+        return a.size.compareTo(b.size);
+      case SortOption.sizeDesc:
+        return b.size.compareTo(a.size);
+    }
+  });
+  return sorted;
+}
+
+class _SortMenu extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final strings = ref.watch(appStringsProvider);
+    String label(SortOption o) => switch (o) {
+          SortOption.nameAsc => strings.sortNameAsc,
+          SortOption.nameDesc => strings.sortNameDesc,
+          SortOption.newest => strings.sortNewest,
+          SortOption.oldest => strings.sortOldest,
+          SortOption.sizeAsc => strings.sortSizeAsc,
+          SortOption.sizeDesc => strings.sortSizeDesc,
+        };
+    return PopupMenuButton<SortOption>(
+      tooltip: strings.sortBy,
+      icon: const Icon(Icons.sort),
+      onSelected: (o) =>
+          ref.read(browseSortProvider.notifier).state = o,
+      itemBuilder: (context) => [
+        for (final o in SortOption.values)
+          PopupMenuItem(value: o, child: Text(label(o))),
+      ],
+    );
+  }
+}
+
+class _FilterBar extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final strings = ref.watch(appStringsProvider);
+    final current = ref.watch(browseFilterProvider);
+    final options = <(EntryKind?, String)>[
+      (null, strings.all),
+      (EntryKind.folder, strings.folders),
+      (EntryKind.image, strings.images),
+      (EntryKind.video, strings.videos),
+      (EntryKind.note, strings.notes),
+    ];
+    return SizedBox(
+      height: 48,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        children: [
+          for (final (kind, label) in options)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ChoiceChip(
+                label: Text(label),
+                selected: current == kind,
+                onSelected: (_) =>
+                    ref.read(browseFilterProvider.notifier).state = kind,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Breadcrumb extends ConsumerWidget {
+  const _Breadcrumb({required this.root, required this.dir});
+
+  final String root;
+  final String dir;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final strings = ref.watch(appStringsProvider);
+    // Build the chain from root down to the current directory.
+    final crumbs = <(String, String)>[(strings.library, root)];
+    final rel = p.relative(dir, from: root);
+    if (rel != '.') {
+      var acc = root;
+      for (final seg in p.split(rel)) {
+        acc = p.join(acc, seg);
+        crumbs.add((seg, acc));
+      }
+    }
+    return SizedBox(
+      height: 40,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        itemCount: crumbs.length,
+        itemBuilder: (context, i) {
+          final (label, path) = crumbs[i];
+          final isLast = i == crumbs.length - 1;
+          return Row(
+            children: [
+              if (i > 0)
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 2),
+                  child: Icon(Icons.chevron_right, size: 18),
+                ),
+              TextButton(
+                onPressed: isLast ? null : () => context.go(browseRoute(path)),
+                child: Text(label),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
 class _EntryView extends ConsumerWidget {
   const _EntryView({
     required this.dir,
@@ -219,7 +371,7 @@ class _EntryView extends ConsumerWidget {
             child: ListTile(
               leading: _EntryThumb(entry: e, size: 40),
               title: Text(e.displayName),
-              subtitle: e.isFolder ? null : Text(_subtitle(e)),
+              subtitle: e.isFolder ? _tagsLine(e) : _fileSubtitle(e),
               trailing: _EntryMenu(dir: dir, entry: e),
               onTap: () => _open(context, e),
             ),
@@ -277,10 +429,16 @@ class _EntryView extends ConsumerWidget {
     );
   }
 
-  String _subtitle(LibraryEntry e) {
+  Widget? _tagsLine(LibraryEntry e) =>
+      e.tags.isEmpty ? null : Text('#${e.tags.join(' #')}');
+
+  Widget _fileSubtitle(LibraryEntry e) {
     final kb = e.size / 1024;
-    if (kb < 1024) return '${kb.toStringAsFixed(0)} Ko';
-    return '${(kb / 1024).toStringAsFixed(1)} Mo';
+    final size = kb < 1024
+        ? '${kb.toStringAsFixed(0)} Ko'
+        : '${(kb / 1024).toStringAsFixed(1)} Mo';
+    final tags = e.tags.isEmpty ? '' : '  ·  #${e.tags.join(' #')}';
+    return Text('$size$tags', maxLines: 1, overflow: TextOverflow.ellipsis);
   }
 }
 
@@ -338,6 +496,11 @@ class _EntryMenu extends ConsumerWidget {
           case 'favorite':
             await controller.setFavorite(entry.path, !entry.isFavorite,
                 parentDir: dir);
+          case 'tags':
+            final tags = await _promptTags(context, strings, entry.tags);
+            if (tags != null) {
+              await controller.setTags(entry.path, tags, parentDir: dir);
+            }
           case 'rename':
             final name = await promptForName(
               context,
@@ -350,6 +513,14 @@ class _EntryMenu extends ConsumerWidget {
             if (name != null && name.trim().isNotEmpty) {
               await controller.rename(entry.path, name.trim(), parentDir: dir);
             }
+          case 'move':
+            final dest = await FilePicker.platform
+                .getDirectoryPath(dialogTitle: strings.chooseDestination);
+            if (dest != null && !p.equals(dest, dir)) {
+              await controller.move(entry.path, dest, parentDir: dir);
+            }
+          case 'duplicate':
+            await controller.duplicate(entry.path, parentDir: dir);
           case 'delete':
             final ok = await confirmDelete(context, strings);
             if (ok == true) {
@@ -364,7 +535,10 @@ class _EntryMenu extends ConsumerWidget {
               ? strings.removeFromFavorites
               : strings.addToFavorites),
         ),
+        PopupMenuItem(value: 'tags', child: Text(strings.editTags)),
         PopupMenuItem(value: 'rename', child: Text(strings.rename)),
+        PopupMenuItem(value: 'move', child: Text(strings.move)),
+        PopupMenuItem(value: 'duplicate', child: Text(strings.duplicate)),
         PopupMenuItem(value: 'delete', child: Text(strings.delete)),
       ],
     );
@@ -464,6 +638,43 @@ Future<String?> promptForName(
         FilledButton(
           onPressed: () => Navigator.pop(context, controller.text),
           child: Text(confirmLabel),
+        ),
+      ],
+    ),
+  );
+}
+
+/// Comma-separated tag editor. Returns the parsed list, or null on cancel.
+Future<List<String>?> _promptTags(
+    BuildContext context, AppStrings strings, List<String> current) {
+  final controller = TextEditingController(text: current.join(', '));
+  return showDialog<List<String>>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: Text(strings.editTags),
+      content: TextField(
+        controller: controller,
+        autofocus: true,
+        decoration: InputDecoration(
+          labelText: strings.tags,
+          hintText: strings.tagsHint,
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(strings.cancel),
+        ),
+        FilledButton(
+          onPressed: () {
+            final tags = controller.text
+                .split(',')
+                .map((t) => t.trim())
+                .where((t) => t.isNotEmpty)
+                .toList();
+            Navigator.pop(context, tags);
+          },
+          child: Text(strings.save),
         ),
       ],
     ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/providers/settings_providers.dart';
 import 'constants/app_constants.dart';
 import 'router.dart';
 import 'theme/app_theme.dart';
@@ -13,13 +14,15 @@ class ClipboardApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
+    final settings = ref.watch(settingsProvider);
 
     return MaterialApp.router(
       title: AppConstants.appName,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
-      themeMode: ThemeMode.system,
+      themeMode: settings.themeMode,
+      locale: Locale(settings.languageCode),
       routerConfig: router,
       supportedLocales: const [Locale('fr'), Locale('en')],
       localizationsDelegates: const [

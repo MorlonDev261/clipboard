@@ -1,6 +1,8 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../providers/settings_providers.dart';
+
 /// Lightweight, dependency-free localisation for the MVP (French default,
 /// English fallback). Easily replaceable by flutter_localizations / ARB later.
 class AppStrings {
@@ -129,9 +131,61 @@ class AppStrings {
   String importReport(int ok, int failed) => failed == 0
       ? _t('$ok élément(s) importé(s).', '$ok item(s) imported.')
       : _t('$ok importé(s), $failed échec(s).', '$ok imported, $failed failed.');
+
+  // Search
+  String get searchHint =>
+      _t('Rechercher dans la bibliothèque…', 'Search the library…');
+  String get searchPrompt => _t(
+        'Tapez pour rechercher par nom ou tag.',
+        'Type to search by name or tag.',
+      );
+  String get noResults => _t('Aucun résultat', 'No results');
+  String get all => _t('Tous', 'All');
+
+  // Sort
+  String get sortBy => _t('Trier par', 'Sort by');
+  String get sortNameAsc => _t('Nom (A→Z)', 'Name (A→Z)');
+  String get sortNameDesc => _t('Nom (Z→A)', 'Name (Z→A)');
+  String get sortNewest => _t('Plus récent', 'Newest');
+  String get sortOldest => _t('Plus ancien', 'Oldest');
+  String get sortSizeAsc => _t('Taille croissante', 'Size ascending');
+  String get sortSizeDesc => _t('Taille décroissante', 'Size descending');
+
+  // Tags
+  String get tags => _t('Tags', 'Tags');
+  String get editTags => _t('Modifier les tags', 'Edit tags');
+  String get tagsHint =>
+      _t('Tags séparés par des virgules', 'Comma-separated tags');
+
+  // Move / duplicate
+  String get move => _t('Déplacer', 'Move');
+  String get duplicate => _t('Dupliquer', 'Duplicate');
+  String get moved => _t('Déplacé.', 'Moved.');
+  String get duplicated => _t('Dupliqué.', 'Duplicated.');
+  String get chooseDestination =>
+      _t('Choisir le dossier de destination', 'Choose destination folder');
+
+  // Favorites
+  String get favoritesEmpty => _t('Aucun favori', 'No favorites yet');
+  String get inFolder => _t('dans', 'in');
+
+  // Settings
+  String get appearance => _t('Apparence', 'Appearance');
+  String get theme => _t('Thème', 'Theme');
+  String get themeSystem => _t('Système', 'System');
+  String get themeLight => _t('Clair', 'Light');
+  String get themeDark => _t('Sombre', 'Dark');
+  String get language => _t('Langue', 'Language');
+  String get french => _t('Français', 'French');
+  String get english => _t('Anglais', 'English');
+  String get defaultView => _t('Vue par défaut', 'Default view');
+  String get viewGrid => _t('Grille', 'Grid');
+  String get viewList => _t('Liste', 'List');
 }
 
-/// Current app strings. Defaults to French for the MVP.
+/// Current app strings, following the language chosen in settings (French by
+/// default).
 final appStringsProvider = Provider<AppStrings>((ref) {
-  return const AppStrings(Locale('fr'));
+  final code = ref.watch(settingsProvider).languageCode;
+  return AppStrings(Locale(code));
 });
