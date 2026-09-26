@@ -20,9 +20,13 @@ import '../domain/library_entry.dart';
 /// Browses a real directory on disk: subfolders + files, with breadcrumb,
 /// sort, filters, create, import, drag & drop and per-entry actions.
 class BrowseScreen extends ConsumerStatefulWidget {
-  const BrowseScreen({required this.dirPath, super.key});
+  const BrowseScreen({required this.dirPath, this.showBack = true, super.key});
 
   final String dirPath;
+
+  /// When false (used as the Home tab's root view), no back button is shown
+  /// and the title falls back to the app name.
+  final bool showBack;
 
   @override
   ConsumerState<BrowseScreen> createState() => _BrowseScreenState();
@@ -45,8 +49,12 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: BackButton(onPressed: () => _back(context)),
-        title: Text(isRoot ? strings.library : p.basename(_dir)),
+        automaticallyImplyLeading: widget.showBack,
+        leading:
+            widget.showBack ? BackButton(onPressed: () => _back(context)) : null,
+        title: Text(!widget.showBack
+            ? strings.appName
+            : (isRoot ? strings.library : p.basename(_dir))),
         actions: [
           _SortMenu(),
           IconButton(

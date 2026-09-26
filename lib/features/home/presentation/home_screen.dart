@@ -1,15 +1,13 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
-import '../../../app/constants/app_constants.dart';
-import '../../../app/nav.dart';
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/providers/workspace_providers.dart';
-import '../../library/application/library_providers.dart';
-import '../../library/domain/library_entry.dart';
+import '../../library/presentation/browse_screen.dart';
 
+/// Home tab: shows the working folder directly (its contents + the Add button)
+/// once a workspace is chosen, or the workspace picker otherwise.
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
@@ -25,20 +23,25 @@ class HomeScreen extends ConsumerWidget {
     final strings = ref.watch(appStringsProvider);
     final workspace = ref.watch(workspaceControllerProvider);
 
-    return Scaffold(
-      appBar: AppBar(title: Text(strings.appName)),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: AppConstants.maxContentWidth),
-          child: workspace.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Center(child: Text(strings.genericError)),
-            data: (root) => root == null
-                ? _ChooseWorkspace(onPick: () => _pickWorkspace(ref))
-                : _Dashboard(root: root),
-          ),
-        ),
+    return workspace.when(
+      loading: () => const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
       ),
+      error: (e, _) => Scaffold(
+        appBar: AppBar(title: Text(strings.appName)),
+        body: Center(child: Text(strings.genericError)),
+      ),
+      data: (root) {
+        if (root == null) {
+          return Scaffold(
+            appBar: AppBar(title: Text(strings.appName)),
+            body: _ChooseWorkspace(onPick: () => _pickWorkspace(ref)),
+          );
+        }
+        // The working folder IS the home view: add/import/drag & drop happen
+        // directly here, on the current (root) folder.
+        return BrowseScreen(dirPath: root, showBack: false);
+      },
     );
   }
 }
@@ -74,95 +77,6 @@ class _ChooseWorkspace extends ConsumerWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _Dashboard extends ConsumerWidget {
-  const _Dashboard({required this.root});
-
-  final String root;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final strings = ref.watch(appStringsProvider);
-    final listing = ref.watch(directoryProvider(root));
-
-    return ListView(
-      padding: const EdgeInsets.all(AppConstants.defaultPadding),
-      children: [
-        Card(
-          child: ListTile(
-            leading: const Icon(Icons.folder_open),
-            title: Text(strings.workspaceFolder),
-            subtitle: Text(root),
-          ),
-        ),
-        const SizedBox(height: 16),
-        FilledButton.icon(
-          onPressed: () => context.push(browseRoute(root)),
-          icon: const Icon(Icons.grid_view_rounded),
-          label: Text(strings.openLibrary),
-        ),
-        const SizedBox(height: 24),
-        Text(strings.contents, style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 12),
-        listing.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Text(strings.genericError),
-          data: (entries) => _StatsRow(entries: entries),
-        ),
-      ],
-    );
-  }
-}
-
-class _StatsRow extends ConsumerWidget {
-  const _StatsRow({required this.entries});
-
-  final List<LibraryEntry> entries;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final strings = ref.watch(appStringsProvider);
-    int count(bool Function(LibraryEntry) test) => entries.where(test).length;
-    final items = <(IconData, String, int)>[
-      (Icons.folder_outlined, strings.folders, count((e) => e.isFolder)),
-      (Icons.image_outlined, strings.images, count((e) => e.isImage)),
-      (Icons.videocam_outlined, strings.videos, count((e) => e.isVideo)),
-      (Icons.notes_outlined, strings.notes, count((e) => e.isNote)),
-    ];
-    final columns =
-        MediaQuery.sizeOf(context).width >= AppConstants.desktopBreakpoint ? 4 : 2;
-    return GridView.count(
-      crossAxisCount: columns,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 12,
-      crossAxisSpacing: 12,
-      childAspectRatio: 1.8,
-      children: [
-        for (final (icon, label, value) in items)
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(icon, color: Theme.of(context).colorScheme.primary),
-                  const SizedBox(height: 8),
-                  Text('$value',
-                      style: Theme.of(context)
-                          .textTheme
-                          .headlineSmall
-                          ?.copyWith(fontWeight: FontWeight.bold)),
-                  Text(label, style: Theme.of(context).textTheme.bodySmall),
-                ],
-              ),
-            ),
-          ),
-      ],
     );
   }
 }
