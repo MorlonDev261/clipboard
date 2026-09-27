@@ -1,8 +1,9 @@
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/l10n/app_strings.dart';
+import '../../../core/picker/app_file_picker.dart';
+import '../../../core/picker/pick_mode.dart';
 import '../../../core/providers/workspace_providers.dart';
 import '../../library/presentation/browse_screen.dart';
 
@@ -11,10 +12,15 @@ import '../../library/presentation/browse_screen.dart';
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
-  Future<void> _pickWorkspace(WidgetRef ref) async {
-    final dir = await FilePicker.platform.getDirectoryPath();
-    if (dir != null) {
-      await ref.read(workspaceControllerProvider.notifier).setRoot(dir);
+  Future<void> _pickWorkspace(BuildContext context, WidgetRef ref) async {
+    final strings = ref.read(appStringsProvider);
+    final dirs = await AppFilePicker.pick(
+      context,
+      mode: PickMode.directory,
+      title: strings.chooseWorkspace,
+    );
+    if (dirs.isNotEmpty) {
+      await ref.read(workspaceControllerProvider.notifier).setRoot(dirs.first);
     }
   }
 
@@ -35,7 +41,7 @@ class HomeScreen extends ConsumerWidget {
         if (root == null) {
           return Scaffold(
             appBar: AppBar(title: Text(strings.appName)),
-            body: _ChooseWorkspace(onPick: () => _pickWorkspace(ref)),
+            body: _ChooseWorkspace(onPick: () => _pickWorkspace(context, ref)),
           );
         }
         // The working folder IS the home view: add/import/drag & drop happen
@@ -54,28 +60,35 @@ class _ChooseWorkspace extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final strings = ref.watch(appStringsProvider);
-    return Padding(
-      padding: const EdgeInsets.all(32),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.folder_special_outlined,
-              size: 64, color: Theme.of(context).colorScheme.primary),
-          const SizedBox(height: 16),
-          Text(strings.chooseWorkspace,
-              style: Theme.of(context).textTheme.titleLarge,
-              textAlign: TextAlign.center),
-          const SizedBox(height: 8),
-          Text(strings.workspaceIntro,
-              style: Theme.of(context).textTheme.bodyMedium,
-              textAlign: TextAlign.center),
-          const SizedBox(height: 24),
-          FilledButton.icon(
-            onPressed: onPick,
-            icon: const Icon(Icons.drive_folder_upload_outlined),
-            label: Text(strings.chooseWorkspace),
-          ),
-        ],
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Image.asset(
+              'assets/icon/icon.png',
+              width: 160,
+              height: 160,
+              filterQuality: FilterQuality.medium,
+            ),
+            const SizedBox(height: 24),
+            Text(strings.chooseWorkspace,
+                style: Theme.of(context).textTheme.titleLarge,
+                textAlign: TextAlign.center),
+            const SizedBox(height: 8),
+            Text(strings.workspaceIntro,
+                style: Theme.of(context).textTheme.bodyMedium,
+                textAlign: TextAlign.center),
+            const SizedBox(height: 24),
+            FilledButton.icon(
+              onPressed: onPick,
+              icon: const Icon(Icons.drive_folder_upload_outlined),
+              label: Text(strings.chooseWorkspace),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -1,8 +1,9 @@
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/l10n/app_strings.dart';
+import '../../../core/picker/app_file_picker.dart';
+import '../../../core/picker/pick_mode.dart';
 import '../../../core/providers/settings_providers.dart';
 import '../../../core/providers/workspace_providers.dart';
 import '../../../shared/enums/enums.dart';
@@ -10,10 +11,15 @@ import '../../../shared/enums/enums.dart';
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
-  Future<void> _changeWorkspace(WidgetRef ref) async {
-    final dir = await FilePicker.platform.getDirectoryPath();
-    if (dir != null) {
-      await ref.read(workspaceControllerProvider.notifier).setRoot(dir);
+  Future<void> _changeWorkspace(BuildContext context, WidgetRef ref) async {
+    final strings = ref.read(appStringsProvider);
+    final dirs = await AppFilePicker.pick(
+      context,
+      mode: PickMode.directory,
+      title: strings.changeWorkspace,
+    );
+    if (dirs.isNotEmpty) {
+      await ref.read(workspaceControllerProvider.notifier).setRoot(dirs.first);
     }
   }
 
@@ -37,7 +43,7 @@ class SettingsScreen extends ConsumerWidget {
           ListTile(
             leading: const Icon(Icons.drive_folder_upload_outlined),
             title: Text(strings.changeWorkspace),
-            onTap: () => _changeWorkspace(ref),
+            onTap: () => _changeWorkspace(context, ref),
           ),
           const Divider(),
           _SectionHeader(strings.appearance),
