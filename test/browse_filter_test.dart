@@ -6,8 +6,9 @@ import 'package:path/path.dart' as p;
 
 /// Builds a fake recursive listing (paths only) the way
 /// LibraryRepository.listAllUnder would: a folder entry per directory and a
-/// file entry per file, all with absolute paths. Uses POSIX-style paths, which
-/// package:path handles natively on the test host.
+/// file entry per file, all with absolute paths. Paths are built with
+/// [p.join] so the separators match the host platform (Windows uses `\`),
+/// exactly like the real filesystem-derived paths the code operates on.
 LibraryEntry _folder(String path) => LibraryEntry(
       path: path,
       name: p.basename(path),
@@ -28,69 +29,72 @@ List<String> _paths(List<LibraryEntry> entries) =>
     entries.map((e) => e.path).toList();
 
 void main() {
-  const dir = '/w';
+  // Base directory the browser is viewing. Everything below is built relative
+  // to it with p.join so the test is portable across platforms.
+  final dir = p.join('workspace', 'root');
+  String at(List<String> segments) => p.joinAll([dir, ...segments]);
 
   group('entriesForFilter (image)', () {
     test('shows direct files first, then containing folders by proximity', () {
-      // /w
+      // dir/
       //   Dossier 1/                              (no image)
       //   Dossier 2/sous1/soussous/img.jpg        (image, depth 4)
       //   Dossier 3/sous1/img.jpg                 (image, depth 3)
       //   fichier img 1.jpg                        (image, depth 1)
       //   fichier img 2.jpg                        (image, depth 1)
       final recursive = <LibraryEntry>[
-        _folder('/w/Dossier 1'),
-        _folder('/w/Dossier 2'),
-        _folder('/w/Dossier 2/sous1'),
-        _folder('/w/Dossier 2/sous1/soussous'),
-        _file('/w/Dossier 2/sous1/soussous/img.jpg'),
-        _folder('/w/Dossier 3'),
-        _folder('/w/Dossier 3/sous1'),
-        _file('/w/Dossier 3/sous1/img.jpg'),
-        _file('/w/fichier img 1.jpg'),
-        _file('/w/fichier img 2.jpg'),
+        _folder(at(['Dossier 1'])),
+        _folder(at(['Dossier 2'])),
+        _folder(at(['Dossier 2', 'sous1'])),
+        _folder(at(['Dossier 2', 'sous1', 'soussous'])),
+        _file(at(['Dossier 2', 'sous1', 'soussous', 'img.jpg'])),
+        _folder(at(['Dossier 3'])),
+        _folder(at(['Dossier 3', 'sous1'])),
+        _file(at(['Dossier 3', 'sous1', 'img.jpg'])),
+        _file(at(['fichier img 1.jpg'])),
+        _file(at(['fichier img 2.jpg'])),
       ];
 
       final result = entriesForFilter(recursive, dir, EntryKind.image);
 
       expect(_paths(result), [
-        '/w/fichier img 1.jpg',
-        '/w/fichier img 2.jpg',
-        '/w/Dossier 3', // nearest match at depth 3
-        '/w/Dossier 2', // nearest match at depth 4
+        at(['fichier img 1.jpg']),
+        at(['fichier img 2.jpg']),
+        at(['Dossier 3']), // nearest match at depth 3
+        at(['Dossier 2']), // nearest match at depth 4
       ]);
     });
 
     test('omits folders that contain no match', () {
       final recursive = <LibraryEntry>[
-        _folder('/w/Empty'),
-        _folder('/w/Empty/deeper'),
-        _file('/w/Empty/deeper/notes.md'),
-        _folder('/w/HasImage'),
-        _file('/w/HasImage/pic.png'),
+        _folder(at(['Empty'])),
+        _folder(at(['Empty', 'deeper'])),
+        _file(at(['Empty', 'deeper', 'notes.md'])),
+        _folder(at(['HasImage'])),
+        _file(at(['HasImage', 'pic.png'])),
       ];
 
       final result = entriesForFilter(recursive, dir, EntryKind.image);
 
-      expect(_paths(result), ['/w/HasImage']);
+      expect(_paths(result), [at(['HasImage'])]);
     });
 
     test('uses the shallowest match to rank a folder', () {
-      // A folder holds one shallow and one deep image; ranking uses the shallow
-      // one, so it beats a folder whose only match is deeper.
+      // Folder A holds one shallow and one deep image; ranking uses the shallow
+      // one, so it beats folder B whose only match is deeper.
       final recursive = <LibraryEntry>[
-        _folder('/w/A'),
-        _file('/w/A/near.png'), // depth 2
-        _folder('/w/A/deep'),
-        _file('/w/A/deep/far.png'), // depth 3
-        _folder('/w/B'),
-        _folder('/w/B/x'),
-        _file('/w/B/x/only.png'), // depth 3
+        _folder(at(['A'])),
+        _file(at(['A', 'near.png'])), // depth 2
+        _folder(at(['A', 'deep'])),
+        _file(at(['A', 'deep', 'far.png'])), // depth 3
+        _folder(at(['B'])),
+        _folder(at(['B', 'x'])),
+        _file(at(['B', 'x', 'only.png'])), // depth 3
       ];
 
       final result = entriesForFilter(recursive, dir, EntryKind.image);
 
-      expect(_paths(result), ['/w/A', '/w/B']);
+      expect(_paths(result), [at(['A']), at(['B'])]);
     });
 
     test('surfaces the direct child for media attached to a note deeper down',
@@ -98,58 +102,63 @@ void main() {
       // Note attachments live in a hidden `.attachments` folder that is never
       // itself a listed folder entry; the match must still surface Dossier.
       final recursive = <LibraryEntry>[
-        _folder('/w/Dossier'),
-        _folder('/w/Dossier/sub'),
-        _file('/w/Dossier/sub/.attachments/pic.jpg'),
+        _folder(at(['Dossier'])),
+        _folder(at(['Dossier', 'sub'])),
+        _file(at(['Dossier', 'sub', '.attachments', 'pic.jpg'])),
       ];
 
       final result = entriesForFilter(recursive, dir, EntryKind.image);
 
-      expect(_paths(result), ['/w/Dossier']);
+      expect(_paths(result), [at(['Dossier'])]);
     });
 
     test('skips the current folder\'s own hidden attachments', () {
       final recursive = <LibraryEntry>[
-        _file('/w/.attachments/pic.jpg'),
-        _folder('/w/Real'),
-        _file('/w/Real/pic.png'),
+        _file(at(['.attachments', 'pic.jpg'])),
+        _folder(at(['Real'])),
+        _file(at(['Real', 'pic.png'])),
       ];
 
       final result = entriesForFilter(recursive, dir, EntryKind.image);
 
       // Only the folder with a real, browsable image — the current folder's own
       // hidden attachment is not a surfaceable entry.
-      expect(_paths(result), ['/w/Real']);
+      expect(_paths(result), [at(['Real'])]);
     });
   });
 
   group('entriesForFilter (folder)', () {
     test('lists the direct sub-folders by name', () {
       final recursive = <LibraryEntry>[
-        _folder('/w/Beta'),
-        _folder('/w/Alpha'),
-        _folder('/w/Alpha/nested'), // not a direct child
-        _file('/w/loose.png'),
+        _folder(at(['Beta'])),
+        _folder(at(['Alpha'])),
+        _folder(at(['Alpha', 'nested'])), // not a direct child
+        _file(at(['loose.png'])),
       ];
 
       final result = entriesForFilter(recursive, dir, EntryKind.folder);
 
-      expect(_paths(result), ['/w/Alpha', '/w/Beta']);
+      expect(_paths(result), [at(['Alpha']), at(['Beta'])]);
     });
   });
 
   group('sortEntries', () {
     test('puts folders first, then sorts by name ascending', () {
       final entries = <LibraryEntry>[
-        _file('/w/b.png'),
-        _folder('/w/Zeta'),
-        _file('/w/a.png'),
-        _folder('/w/Alpha'),
+        _file(at(['b.png'])),
+        _folder(at(['Zeta'])),
+        _file(at(['a.png'])),
+        _folder(at(['Alpha'])),
       ];
 
       final result = sortEntries(entries, SortOption.nameAsc);
 
-      expect(_paths(result), ['/w/Alpha', '/w/Zeta', '/w/a.png', '/w/b.png']);
+      expect(_paths(result), [
+        at(['Alpha']),
+        at(['Zeta']),
+        at(['a.png']),
+        at(['b.png']),
+      ]);
     });
   });
 }
