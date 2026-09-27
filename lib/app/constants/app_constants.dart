@@ -1,6 +1,6 @@
 /// App-wide constants and configurable defaults.
 abstract final class AppConstants {
-  static const String appName = 'Clipboard';
+  static const String appName = 'Influencor.mg';
 
   /// Layout breakpoint (logical pixels) above which the desktop / tablet
   /// layout (persistent sidebar, wider grids) is used.
@@ -22,4 +22,11 @@ abstract final class AppConstants {
 
   static const List<String> imageExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
   static const List<String> videoExtensions = ['mp4', 'mov', 'webm', 'avi'];
+
+  /// Font used to render note text so the native Unicode styling looks right:
+  /// Arial keeps normal text familiar and draws a continuous, centred strike
+  /// (U+0336); Cambria Math supplies the bold/italic math letters (and also
+  /// centres the strike); Segoe UI is the last-resort fallback.
+  static const String noteFontFamily = 'Arial';
+  static const List<String> noteFontFallback = ['Cambria Math', 'Segoe UI'];
 }

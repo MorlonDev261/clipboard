@@ -13,7 +13,7 @@ class AppStrings {
   bool get _isEn => locale.languageCode == 'en';
   String _t(String fr, String en) => _isEn ? en : fr;
 
-  String get appName => 'Clipboard';
+  String get appName => 'Influencor.mg';
 
   // Navigation
   String get home => _t('Accueil', 'Home');
@@ -41,9 +41,9 @@ class AppStrings {
   String get chooseWorkspace =>
       _t('Choisir le dossier de travail', 'Choose the working folder');
   String get workspaceIntro => _t(
-        'Clipboard travaille directement dans un dossier de votre disque. '
+        'Influencor travaille directement dans un dossier de votre disque. '
             'Choisissez-le pour commencer.',
-        'Clipboard works directly inside a folder on your disk. '
+        'Influencor works directly inside a folder on your disk. '
             'Choose one to get started.',
       );
   String get changeWorkspace =>
@@ -78,6 +78,30 @@ class AppStrings {
   String get attachments => _t('Pièces jointes', 'Attachments');
   String photosAttached(int n) =>
       _t('$n photo(s) jointe(s).', '$n photo(s) attached.');
+
+  // Rich-text formatting toolbar
+  String get bold => _t('Gras', 'Bold');
+  String get italic => _t('Italique', 'Italic');
+  String get underline => _t('Souligné', 'Underline');
+  String get strikethrough => _t('Barré', 'Strikethrough');
+  String get monospace => _t('Code / chasse fixe', 'Code / monospace');
+  String get bulletList => _t('Liste à puces', 'Bullet list');
+  String get numberedList => _t('Liste numérotée', 'Numbered list');
+  String get clearFormatting => _t('Effacer la mise en forme', 'Clear formatting');
+  String get selectTextFirst =>
+      _t('Sélectionnez d\'abord du texte.', 'Select some text first.');
+  String get preview => _t('Aperçu', 'Preview');
+  String get sent => _t('Envoyé', 'Sent');
+
+  // Copy modes
+  String get copyForSocial =>
+      _t('Copier pour les réseaux sociaux', 'Copy for social media');
+  String get copyPlainText => _t('Copier en texte simple', 'Copy as plain text');
+  String get copyMarkdown => _t('Copier en Markdown', 'Copy as Markdown');
+  String get socialPreviewTitle =>
+      _t('Aperçu réseaux sociaux', 'Social media preview');
+  String get copyFailed =>
+      _t('Échec de la copie dans le presse-papiers.', 'Failed to copy to clipboard.');
 
   // Dialogs
   String get nameLabel => _t('Nom', 'Name');
@@ -124,6 +148,10 @@ class AppStrings {
   String get comingSoon => _t('Bientôt disponible.', 'Coming soon.');
   String get copiedToClipboard =>
       _t('Copié dans le presse-papiers', 'Copied to clipboard');
+  String copiedWithFiles(int n) => _t(
+        'Texte et $n fichier(s) copiés',
+        'Text and $n file(s) copied',
+      );
   String get noteSaved => _t('Note enregistrée.', 'Note saved.');
   String get itemDeleted => _t('Élément supprimé.', 'Item deleted.');
   String get videoPreviewHint => _t(
@@ -185,6 +213,26 @@ class AppStrings {
   String get defaultView => _t('Vue par défaut', 'Default view');
   String get viewGrid => _t('Grille', 'Grid');
   String get viewList => _t('Liste', 'List');
+
+  // In-app file picker
+  String get selectFilesTitle =>
+      _t('Sélectionner des fichiers', 'Select files');
+  String get selectImagesTitle =>
+      _t('Sélectionner des photos', 'Select photos');
+  String get multipleSelection => _t('Sélection multiple', 'Multiple selection');
+  String get chooseThisFolder => _t('Choisir ce dossier', 'Choose this folder');
+  String get parentFolder => _t('Dossier parent', 'Parent folder');
+  String get importAction => _t('Importer', 'Import');
+  String get selectAction => _t('Sélectionner', 'Select');
+  String get folderAccessError => _t(
+        'Impossible d\'accéder à ce dossier.',
+        'Cannot access this folder.',
+      );
+  String get locationHome => _t('Dossier personnel', 'Home');
+  String get locationDesktop => _t('Bureau', 'Desktop');
+  String get locationDocuments => _t('Documents', 'Documents');
+  String get locationDownloads => _t('Téléchargements', 'Downloads');
+  String nSelected(int n) => _t('$n sélectionné(s)', '$n selected');
 }
 
 /// Current app strings, following the language chosen in settings (French by
