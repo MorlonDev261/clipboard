@@ -94,15 +94,15 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
 
     final filter = ref.watch(browseFilterProvider);
 
-    // With a kind filter active we need the recursive listing to know which
+    // With a kind filter active we need the recursive listing so that, for any
 
-    // sub-folders lead to a match; _entriesForFilter then shows the matching
+    // match nested deep down, _entriesForFilter can surface the folder directly
 
-    // files in this folder plus those containing sub-folders (deep items are
+    // holding it at this level (never the deep item itself), ranked by
 
-    // not flattened — you drill into the folder). The unfiltered "all" view
+    // relevance. The unfiltered "all" view stays a plain, direct-children
 
-    // stays a plain, direct-children listing for normal browsing.
+    // listing for normal browsing.
 
     final listing = filter == null
 
@@ -258,9 +258,7 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
 
                           ? _sortEntries(entries, sort)
 
-                          : _sortEntries(
-
-                              _entriesForFilter(entries, _dir, filter), sort);
+                          : _entriesForFilter(entries, _dir, filter);
 
                       if (visible.isEmpty) {
 
@@ -488,27 +486,69 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
 
 
 
-/// Reduces the recursive listing of [dir] to what the browser shows under a
-/// kind [filter]: the direct children of [dir] that are files of that kind,
-/// plus the direct sub-folders that (recursively) contain at least one matching
-/// item. Deep items are not surfaced themselves — you drill into the folder
-/// that holds them. Under the folder filter, every direct sub-folder is kept.
+/// Builds the browser's view for a kind [filter] from the recursive listing of
+/// [dir]. No element living in a sub-folder is shown directly; instead, for
+/// each match found deep down, the folder that *directly* contains it is
+/// surfaced at the current level as a shortcut ("there is matching content in
+/// here"). Matching files that live right in [dir] are shown as themselves.
+///
+/// Results are ordered by relevance — the surfaced folder holding the most
+/// matches comes first — so the most promising places to look are at the top.
+/// Under the folder filter there is nothing to detect: the direct sub-folders
+/// are listed by name.
 List<LibraryEntry> _entriesForFilter(
     List<LibraryEntry> recursive, String dir, EntryKind filter) {
-  final matchPaths =
-      recursive.where((e) => e.kind == filter).map((e) => e.path).toList();
-  bool leadsToMatch(String folderPath) =>
-      matchPaths.any((m) => p.isWithin(folderPath, m));
-  final out = <LibraryEntry>[];
+  if (filter == EntryKind.folder) {
+    final folders = recursive
+        .where((e) => e.isFolder && p.equals(p.dirname(e.path), dir))
+        .toList();
+    return _sortEntries(folders, SortOption.nameAsc);
+  }
+
+  // Folder entries indexed by path, so a match can be mapped to the folder
+  // that should represent it.
+  final foldersByPath = <String, LibraryEntry>{
+    for (final e in recursive)
+      if (e.isFolder) e.path: e,
+  };
+
+  final directFiles = <LibraryEntry>[];
+  final folderCounts = <String, int>{};
   for (final e in recursive) {
-    if (!p.equals(p.dirname(e.path), dir)) continue; // direct children only
-    if (e.isFolder) {
-      if (filter == EntryKind.folder || leadsToMatch(e.path)) out.add(e);
-    } else if (e.kind == filter) {
-      out.add(e);
+    if (e.kind != filter) continue;
+    var parent = p.dirname(e.path);
+    final inAttachments = p.basename(parent) == '.attachments';
+    // Media attached to notes lives in a hidden `.attachments` folder; surface
+    // the note's real folder instead of that hidden one.
+    if (inAttachments) parent = p.dirname(parent);
+    if (p.equals(parent, dir)) {
+      // Right here in the current folder: show the item itself, unless it is a
+      // note attachment (hidden, not a browsable entry — it just means "this
+      // folder has matching content", but we are already in it).
+      if (!inAttachments) directFiles.add(e);
+    } else {
+      folderCounts.update(parent, (n) => n + 1, ifAbsent: () => 1);
     }
   }
-  return out;
+
+  // Score every result by how many matches it represents: a surfaced folder by
+  // its match count, a direct file by one. Most relevant first; ties keep
+  // folders ahead of files, then sort by name.
+  final scored = <(LibraryEntry, int)>[
+    for (final entry in folderCounts.entries)
+      if (foldersByPath[entry.key] != null)
+        (foldersByPath[entry.key]!, entry.value),
+    for (final f in directFiles) (f, 1),
+  ];
+  scored.sort((a, b) {
+    final byScore = b.$2.compareTo(a.$2);
+    if (byScore != 0) return byScore;
+    if (a.$1.isFolder != b.$1.isFolder) return a.$1.isFolder ? -1 : 1;
+    return a.$1.displayName
+        .toLowerCase()
+        .compareTo(b.$1.displayName.toLowerCase());
+  });
+  return [for (final s in scored) s.$1];
 }
 
 /// Sorts entries with folders first, then by the chosen [sort] option.
@@ -936,7 +976,7 @@ class _EntryView extends ConsumerWidget {
 
               title: Text(e.displayName),
 
-              subtitle: e.isFolder ? _tagsLine(e) : _fileSubtitle(e),
+              subtitle: e.isFolder ? _folderSubtitle(e) : _fileSubtitle(e),
 
               trailing: _EntryMenu(dir: dir, entry: e),
 
@@ -1055,6 +1095,34 @@ class _EntryView extends ConsumerWidget {
   Widget? _tagsLine(LibraryEntry e) =>
 
       e.tags.isEmpty ? null : Text('#${e.tags.join(' #')}');
+
+
+
+  /// Subtitle for a folder row. A folder surfaced from a filter (i.e. not a
+
+  /// direct child of the current directory) shows its relative location, so you
+
+  /// can tell where the matching content is nested; otherwise its tags.
+
+  Widget? _folderSubtitle(LibraryEntry e) {
+
+    if (!p.equals(p.dirname(e.path), dir)) {
+
+      return Text(
+
+        p.relative(e.path, from: dir),
+
+        maxLines: 1,
+
+        overflow: TextOverflow.ellipsis,
+
+      );
+
+    }
+
+    return _tagsLine(e);
+
+  }
 
 
 
