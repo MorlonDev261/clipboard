@@ -21,17 +21,17 @@ class SettingsController extends AsyncNotifier<AppSettings> {
   }
 
   Future<void> setThemeMode(ThemeMode mode) async {
-    final current = state.valueOrNull ?? const AppSettings();
+    final current = state.value ?? const AppSettings();
     await _update(current.copyWith(themeMode: mode));
   }
 
   Future<void> setViewMode(ViewMode mode) async {
-    final current = state.valueOrNull ?? const AppSettings();
+    final current = state.value ?? const AppSettings();
     await _update(current.copyWith(viewMode: mode));
   }
 
   Future<void> setLanguage(String code) async {
-    final current = state.valueOrNull ?? const AppSettings();
+    final current = state.value ?? const AppSettings();
     await _update(current.copyWith(languageCode: code));
   }
 }
@@ -42,6 +42,6 @@ final settingsControllerProvider =
 
 /// Convenience: current settings (defaults until loaded).
 final settingsProvider = Provider<AppSettings>((ref) {
-  return ref.watch(settingsControllerProvider).valueOrNull ??
+  return ref.watch(settingsControllerProvider).value ??
       const AppSettings();
 });

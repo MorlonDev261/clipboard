@@ -74,23 +74,34 @@ class LibraryRepository {
     return entries;
   }
 
-  /// Recursively lists every entry under the workspace root (skipping hidden
-  /// directories such as `.clipboard`). Used by search and favorites.
-  Future<List<LibraryEntry>> listAllEntries() => listAllUnder(root);
+  /// Recursively lists every entry under the workspace root. Used by search and
+  /// favorites, which also include note attachments (media in `.attachments`).
+  Future<List<LibraryEntry>> listAllEntries() =>
+      listAllUnder(root, includeAttachments: true);
 
-  /// Recursively lists every entry under [dirPath] (used for folder stats).
-  Future<List<LibraryEntry>> listAllUnder(String dirPath) async {
+  /// Recursively lists every entry under [dirPath].
+  ///
+  /// When [includeAttachments] is true, media stored in the hidden
+  /// `.attachments` folders (images/videos attached to notes) is included too —
+  /// used by the folder stats so attachments are counted. The `.attachments`
+  /// folder itself is never added as a folder entry.
+  Future<List<LibraryEntry>> listAllUnder(
+    String dirPath, {
+    bool includeAttachments = false,
+  }) async {
     final meta = await _metadata.load();
     final out = <LibraryEntry>[];
-    await _walk(Directory(dirPath), meta, out);
+    await _walk(Directory(dirPath), meta, out,
+        includeAttachments: includeAttachments);
     return out;
   }
 
   Future<void> _walk(
     Directory dir,
     Map<String, EntryMeta> meta,
-    List<LibraryEntry> out,
-  ) async {
+    List<LibraryEntry> out, {
+    bool includeAttachments = false,
+  }) async {
     List<FileSystemEntity> children;
     try {
       children = await dir.list(followLinks: false).toList();
@@ -99,7 +110,14 @@ class LibraryRepository {
     }
     for (final ent in children) {
       final name = p.basename(ent.path);
-      if (name.startsWith('.')) continue;
+      if (name.startsWith('.')) {
+        // Descend into note attachment folders to count embedded media, but
+        // never list the hidden folder itself.
+        if (includeAttachments && ent is Directory && name == '.attachments') {
+          await _walk(ent, meta, out, includeAttachments: includeAttachments);
+        }
+        continue;
+      }
       FileStat stat;
       try {
         stat = await ent.stat();
@@ -117,7 +135,7 @@ class LibraryRepository {
           isFavorite: m?.favorite ?? false,
           tags: m?.tags ?? const [],
         ));
-        await _walk(ent, meta, out);
+        await _walk(ent, meta, out, includeAttachments: includeAttachments);
       } else if (ent is File) {
         out.add(LibraryEntry(
           path: ent.path,
@@ -130,6 +148,38 @@ class LibraryRepository {
         ));
       }
     }
+  }
+
+  /// Lists the media stored in [dirPath]'s hidden `.attachments` folder as
+  /// regular entries, so note attachments can be surfaced under the media
+  /// filters. Returns an empty list when there is no attachments folder.
+  Future<List<LibraryEntry>> listAttachments(String dirPath) async {
+    final attachDir = Directory(p.join(dirPath, '.attachments'));
+    if (!await attachDir.exists()) return [];
+    final meta = await _metadata.load();
+    final out = <LibraryEntry>[];
+    await for (final ent in attachDir.list(followLinks: false)) {
+      if (ent is! File) continue;
+      final name = p.basename(ent.path);
+      if (name.startsWith('.')) continue;
+      FileStat stat;
+      try {
+        stat = await ent.stat();
+      } catch (_) {
+        continue;
+      }
+      final m = meta[_metadata.relKey(ent.path)];
+      out.add(LibraryEntry(
+        path: ent.path,
+        name: name,
+        kind: kindForFile(name),
+        size: stat.size,
+        modified: stat.modified,
+        isFavorite: m?.favorite ?? false,
+        tags: m?.tags ?? const [],
+      ));
+    }
+    return out;
   }
 
   // --- Create ----------------------------------------------------------------
@@ -162,7 +212,8 @@ class LibraryRepository {
 
   /// Copies an image into a hidden `.attachments` folder next to notes in
   /// [dirPath] and returns its absolute path. Hidden, so it never clutters the
-  /// folder listing or stats.
+  /// folder listing, but it is still counted in the folder stats (see
+  /// [listAllUnder] with `includeAttachments`).
   Future<String> attachImageToDir(String dirPath, String sourcePath) async {
     final attachDir = Directory(p.join(dirPath, '.attachments'));
     await attachDir.create(recursive: true);

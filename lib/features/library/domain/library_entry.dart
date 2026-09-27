@@ -53,9 +53,23 @@ class LibraryEntry {
 }
 
 /// File extensions recognised as images and videos.
-const imageExtensions = {'.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp'};
+const imageExtensions = {
+  '.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp',
+  '.heic', '.heif', '.svg', '.tiff', '.tif', '.avif', '.ico',
+};
 const videoExtensions = {'.mp4', '.mov', '.webm', '.avi', '.mkv', '.m4v'};
 const noteExtensions = {'.md', '.markdown', '.txt'};
+
+/// Image extensions Flutter can decode and display natively for thumbnails.
+/// Other recognised image formats (heic, svg, tiff, avif, ico) still count as
+/// images but fall back to an icon instead of a rendered preview.
+const decodableImageExtensions = {
+  '.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp',
+};
+
+/// Whether a file can be shown as a rendered thumbnail (vs. an image icon).
+bool canRenderThumbnail(String fileName) =>
+    decodableImageExtensions.contains(p.extension(fileName).toLowerCase());
 
 /// Classifies a file (not a directory) by its extension.
 EntryKind kindForFile(String fileName) {

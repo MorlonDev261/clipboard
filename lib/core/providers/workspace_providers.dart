@@ -24,5 +24,5 @@ final workspaceControllerProvider =
 
 /// Convenience: the current root path, or null.
 final workspaceRootProvider = Provider<String?>((ref) {
-  return ref.watch(workspaceControllerProvider).valueOrNull;
+  return ref.watch(workspaceControllerProvider).value;
 });

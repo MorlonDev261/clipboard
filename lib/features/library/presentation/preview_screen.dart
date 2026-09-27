@@ -39,7 +39,7 @@ class PreviewScreen extends ConsumerWidget {
     final listing = ref.watch(directoryProvider(parent));
     final controller = ref.read(libraryControllerProvider);
 
-    final entry = listing.valueOrNull
+    final entry = listing.value
         ?.firstWhereOrNull((e) => p.equals(e.path, path));
 
     final kind = entry?.kind ?? kindForFile(p.basename(path));
@@ -81,13 +81,20 @@ class PreviewScreen extends ConsumerWidget {
       ),
       body: Center(
         child: switch (kind) {
-          EntryKind.image => InteractiveViewer(
+          EntryKind.image when canRenderThumbnail(p.basename(path)) =>
+            InteractiveViewer(
               maxScale: 5,
               child: Image.file(
                 File(path),
                 errorBuilder: (_, __, ___) =>
                     _Info(icon: Icons.broken_image_outlined, text: strings.genericError),
               ),
+            ),
+          EntryKind.image => _Info(
+              icon: Icons.image_outlined,
+              text: p.basename(path),
+              actionLabel: strings.open,
+              onAction: _openExternally,
             ),
           EntryKind.video => _Info(
               icon: Icons.videocam_outlined,
