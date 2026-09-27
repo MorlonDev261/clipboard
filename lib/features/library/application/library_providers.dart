@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart'; // StateProvider (moved here in v3)
 import 'package:path/path.dart' as p;
 
 import '../../../core/providers/workspace_providers.dart';
@@ -40,12 +41,32 @@ final directoryProvider = StreamProvider.autoDispose
   }
   yield await repo.listEntries(dirPath);
   try {
-    await for (final _ in Directory(dirPath).watch()) {
+    // Recursive: a change deep in a sub-folder also re-emits, so the recursive
+    // folder stats (which count sub-folders) stay in sync. Best-effort — some
+    // platforms don't support recursive watching and throw here.
+    await for (final _ in Directory(dirPath).watch(recursive: true)) {
       yield await repo.listEntries(dirPath);
     }
   } catch (_) {
-    // Directory watching is best-effort; ignore watcher errors.
+    // Recursive watching unsupported/failed: fall back to watching this
+    // directory only, so at least direct changes still refresh.
+    try {
+      await for (final _ in Directory(dirPath).watch()) {
+        yield await repo.listEntries(dirPath);
+      }
+    } catch (_) {
+      // Directory watching is best-effort; ignore watcher errors.
+    }
   }
+});
+
+/// Media attached to notes in [dirPath] (the hidden `.attachments` folder),
+/// surfaced only when a media filter is active in the browser.
+final dirAttachmentsProvider = FutureProvider.autoDispose
+    .family<List<LibraryEntry>, String>((ref, dirPath) async {
+  final repo = ref.watch(libraryRepositoryProvider);
+  if (repo == null) return const [];
+  return repo.listAttachments(dirPath);
 });
 
 /// Trashed entries for the current workspace.
@@ -73,10 +94,15 @@ final favoritesProvider = FutureProvider<List<LibraryEntry>>((ref) async {
 typedef DirStats = ({int folders, int images, int videos, int notes});
 
 final dirStatsProvider =
-    FutureProvider.family<DirStats, String>((ref, dirPath) async {
+    FutureProvider.autoDispose.family<DirStats, String>((ref, dirPath) async {
   final repo = ref.watch(libraryRepositoryProvider);
   if (repo == null) return (folders: 0, images: 0, videos: 0, notes: 0);
-  final all = await repo.listAllUnder(dirPath);
+  // Recompute whenever this folder's live listing changes. The watcher is
+  // recursive, so adding/removing items inside a sub-folder refreshes the
+  // counts too (they already count sub-folders recursively).
+  ref.watch(directoryProvider(dirPath));
+  // Include note attachments so images/videos attached to notes are counted.
+  final all = await repo.listAllUnder(dirPath, includeAttachments: true);
   return (
     folders: all.where((e) => e.isFolder).length,
     images: all.where((e) => e.isImage).length,
@@ -108,6 +134,7 @@ class LibraryController {
   void _touchIndex() {
     _ref.invalidate(libraryIndexProvider);
     _ref.invalidate(dirStatsProvider); // refresh all folder stat cards
+    _ref.invalidate(dirAttachmentsProvider); // refresh attachment listings
   }
 
   Future<String> createFolder(String parentPath, String name) async {
@@ -134,6 +161,7 @@ class LibraryController {
   /// Markdown-friendly relative link to embed in a note living in [dirPath].
   Future<String> attachImage(String dirPath, String sourcePath) async {
     final abs = await _repo.attachImageToDir(dirPath, sourcePath);
+    _touchIndex(); // refresh stats so attached images are counted
     return p.relative(abs, from: dirPath).replaceAll(r'\', '/');
   }
 
