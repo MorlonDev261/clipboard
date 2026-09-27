@@ -94,13 +94,15 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
 
     final filter = ref.watch(browseFilterProvider);
 
-    // With a kind filter active, list recursively so matches nested deep in
+    // With a kind filter active we need the recursive listing to know which
 
-    // sub-folders show up too (consistent with the recursive stat cards, and it
+    // sub-folders lead to a match; _entriesForFilter then shows the matching
 
-    // pulls in media attached to notes). The unfiltered "all" view stays a
+    // files in this folder plus those containing sub-folders (deep items are
 
-    // plain folder listing so normal folder-by-folder browsing is unchanged.
+    // not flattened — you drill into the folder). The unfiltered "all" view
+
+    // stays a plain, direct-children listing for normal browsing.
 
     final listing = filter == null
 
@@ -252,7 +254,13 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
 
                     data: (entries) {
 
-                      final visible = _applySortFilter(entries, sort, filter);
+                      final visible = filter == null
+
+                          ? _sortEntries(entries, sort)
+
+                          : _sortEntries(
+
+                              _entriesForFilter(entries, _dir, filter), sort);
 
                       if (visible.isEmpty) {
 
@@ -480,60 +488,52 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
 
 
 
-List<LibraryEntry> _applySortFilter(
-
-    List<LibraryEntry> entries, SortOption sort, EntryKind? filter) {
-
-  var list = entries;
-
-  if (filter != null) {
-
-    list = list.where((e) => e.kind == filter).toList();
-
-  }
-
-  final sorted = [...list];
-
-  int name(LibraryEntry a, LibraryEntry b) =>
-
-      a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase());
-
-  sorted.sort((a, b) {
-
-    if (a.isFolder != b.isFolder) return a.isFolder ? -1 : 1;
-
-    switch (sort) {
-
-      case SortOption.nameAsc:
-
-        return name(a, b);
-
-      case SortOption.nameDesc:
-
-        return name(b, a);
-
-      case SortOption.newest:
-
-        return b.modified.compareTo(a.modified);
-
-      case SortOption.oldest:
-
-        return a.modified.compareTo(b.modified);
-
-      case SortOption.sizeAsc:
-
-        return a.size.compareTo(b.size);
-
-      case SortOption.sizeDesc:
-
-        return b.size.compareTo(a.size);
-
+/// Reduces the recursive listing of [dir] to what the browser shows under a
+/// kind [filter]: the direct children of [dir] that are files of that kind,
+/// plus the direct sub-folders that (recursively) contain at least one matching
+/// item. Deep items are not surfaced themselves — you drill into the folder
+/// that holds them. Under the folder filter, every direct sub-folder is kept.
+List<LibraryEntry> _entriesForFilter(
+    List<LibraryEntry> recursive, String dir, EntryKind filter) {
+  final matchPaths =
+      recursive.where((e) => e.kind == filter).map((e) => e.path).toList();
+  bool leadsToMatch(String folderPath) =>
+      matchPaths.any((m) => p.isWithin(folderPath, m));
+  final out = <LibraryEntry>[];
+  for (final e in recursive) {
+    if (!p.equals(p.dirname(e.path), dir)) continue; // direct children only
+    if (e.isFolder) {
+      if (filter == EntryKind.folder || leadsToMatch(e.path)) out.add(e);
+    } else if (e.kind == filter) {
+      out.add(e);
     }
+  }
+  return out;
+}
 
+/// Sorts entries with folders first, then by the chosen [sort] option.
+List<LibraryEntry> _sortEntries(List<LibraryEntry> entries, SortOption sort) {
+  final sorted = [...entries];
+  int name(LibraryEntry a, LibraryEntry b) =>
+      a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase());
+  sorted.sort((a, b) {
+    if (a.isFolder != b.isFolder) return a.isFolder ? -1 : 1;
+    switch (sort) {
+      case SortOption.nameAsc:
+        return name(a, b);
+      case SortOption.nameDesc:
+        return name(b, a);
+      case SortOption.newest:
+        return b.modified.compareTo(a.modified);
+      case SortOption.oldest:
+        return a.modified.compareTo(b.modified);
+      case SortOption.sizeAsc:
+        return a.size.compareTo(b.size);
+      case SortOption.sizeDesc:
+        return b.size.compareTo(a.size);
+    }
   });
-
   return sorted;
-
 }
 
 
