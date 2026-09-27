@@ -96,13 +96,13 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
 
     // With a kind filter active we need the recursive listing so that, for any
 
-    // match nested deep down, _entriesForFilter can surface the folder directly
+    // match nested deep down, _entriesForFilter can surface the direct
 
-    // holding it at this level (never the deep item itself), ranked by
+    // sub-folder that leads to it (never the deep item itself), ordered by how
 
-    // relevance. The unfiltered "all" view stays a plain, direct-children
+    // close the match is. The unfiltered "all" view stays a plain,
 
-    // listing for normal browsing.
+    // direct-children listing for normal browsing.
 
     final listing = filter == null
 
@@ -487,15 +487,16 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
 
 
 /// Builds the browser's view for a kind [filter] from the recursive listing of
-/// [dir]. No element living in a sub-folder is shown directly; instead, for
-/// each match found deep down, the folder that *directly* contains it is
-/// surfaced at the current level as a shortcut ("there is matching content in
-/// here"). Matching files that live right in [dir] are shown as themselves.
+/// [dir]. Nothing that lives inside a sub-folder is shown directly. Instead:
+///   * matching files that live right in [dir] are shown as themselves, and
+///   * for a match nested anywhere below, the *direct* sub-folder of [dir] that
+///     leads to it is surfaced once (a match in `Dossier/a/b/img` surfaces
+///     `Dossier`), so the user drills into that folder to reach it.
 ///
-/// Results are ordered by relevance — the surfaced folder holding the most
-/// matches comes first — so the most promising places to look are at the top.
-/// Under the folder filter there is nothing to detect: the direct sub-folders
-/// are listed by name.
+/// Results are ordered by proximity — the shallowest (closest) match first — so
+/// matching files right here (depth 1) come before folders, and a folder whose
+/// nearest match is closer ranks above one whose match sits deeper. Under the
+/// folder filter the direct sub-folders are simply listed by name.
 List<LibraryEntry> _entriesForFilter(
     List<LibraryEntry> recursive, String dir, EntryKind filter) {
   if (filter == EntryKind.folder) {
@@ -505,45 +506,36 @@ List<LibraryEntry> _entriesForFilter(
     return _sortEntries(folders, SortOption.nameAsc);
   }
 
-  // Folder entries indexed by path, so a match can be mapped to the folder
-  // that should represent it.
-  final foldersByPath = <String, LibraryEntry>{
+  // Direct children of `dir`, indexed by path: the level we surface results at.
+  final directChildren = <String, LibraryEntry>{
     for (final e in recursive)
-      if (e.isFolder) e.path: e,
+      if (p.equals(p.dirname(e.path), dir)) e.path: e,
   };
 
-  final directFiles = <LibraryEntry>[];
-  final folderCounts = <String, int>{};
+  // Map each match to the direct child of `dir` that leads to it, keeping the
+  // shallowest match depth per child (1 = a matching file right here, 2 =
+  // directly inside a sub-folder, and so on).
+  final bestDepth = <String, int>{};
   for (final e in recursive) {
     if (e.kind != filter) continue;
-    var parent = p.dirname(e.path);
-    final inAttachments = p.basename(parent) == '.attachments';
-    // Media attached to notes lives in a hidden `.attachments` folder; surface
-    // the note's real folder instead of that hidden one.
-    if (inAttachments) parent = p.dirname(parent);
-    if (p.equals(parent, dir)) {
-      // Right here in the current folder: show the item itself, unless it is a
-      // note attachment (hidden, not a browsable entry — it just means "this
-      // folder has matching content", but we are already in it).
-      if (!inAttachments) directFiles.add(e);
-    } else {
-      folderCounts.update(parent, (n) => n + 1, ifAbsent: () => 1);
-    }
+    final segments = p.split(p.relative(e.path, from: dir));
+    if (segments.isEmpty) continue;
+    final childPath = p.join(dir, segments.first);
+    // Only surface it if the leading segment is a real, browsable direct child
+    // (skips e.g. media in this folder's own hidden `.attachments`).
+    if (!directChildren.containsKey(childPath)) continue;
+    final depth = segments.length;
+    bestDepth.update(childPath, (d) => depth < d ? depth : d,
+        ifAbsent: () => depth);
   }
 
-  // Score every result by how many matches it represents: a surfaced folder by
-  // its match count, a direct file by one. Most relevant first; ties keep
-  // folders ahead of files, then sort by name.
-  final scored = <(LibraryEntry, int)>[
-    for (final entry in folderCounts.entries)
-      if (foldersByPath[entry.key] != null)
-        (foldersByPath[entry.key]!, entry.value),
-    for (final f in directFiles) (f, 1),
+  final scored = [
+    for (final entry in bestDepth.entries)
+      (directChildren[entry.key]!, entry.value),
   ];
   scored.sort((a, b) {
-    final byScore = b.$2.compareTo(a.$2);
-    if (byScore != 0) return byScore;
-    if (a.$1.isFolder != b.$1.isFolder) return a.$1.isFolder ? -1 : 1;
+    final byDepth = a.$2.compareTo(b.$2); // shallowest (closest) match first
+    if (byDepth != 0) return byDepth;
     return a.$1.displayName
         .toLowerCase()
         .compareTo(b.$1.displayName.toLowerCase());
@@ -976,7 +968,7 @@ class _EntryView extends ConsumerWidget {
 
               title: Text(e.displayName),
 
-              subtitle: e.isFolder ? _folderSubtitle(e) : _fileSubtitle(e),
+              subtitle: e.isFolder ? _tagsLine(e) : _fileSubtitle(e),
 
               trailing: _EntryMenu(dir: dir, entry: e),
 
@@ -1095,34 +1087,6 @@ class _EntryView extends ConsumerWidget {
   Widget? _tagsLine(LibraryEntry e) =>
 
       e.tags.isEmpty ? null : Text('#${e.tags.join(' #')}');
-
-
-
-  /// Subtitle for a folder row. A folder surfaced from a filter (i.e. not a
-
-  /// direct child of the current directory) shows its relative location, so you
-
-  /// can tell where the matching content is nested; otherwise its tags.
-
-  Widget? _folderSubtitle(LibraryEntry e) {
-
-    if (!p.equals(p.dirname(e.path), dir)) {
-
-      return Text(
-
-        p.relative(e.path, from: dir),
-
-        maxLines: 1,
-
-        overflow: TextOverflow.ellipsis,
-
-      );
-
-    }
-
-    return _tagsLine(e);
-
-  }
 
 
 
