@@ -150,38 +150,6 @@ class LibraryRepository {
     }
   }
 
-  /// Lists the media stored in [dirPath]'s hidden `.attachments` folder as
-  /// regular entries, so note attachments can be surfaced under the media
-  /// filters. Returns an empty list when there is no attachments folder.
-  Future<List<LibraryEntry>> listAttachments(String dirPath) async {
-    final attachDir = Directory(p.join(dirPath, '.attachments'));
-    if (!await attachDir.exists()) return [];
-    final meta = await _metadata.load();
-    final out = <LibraryEntry>[];
-    await for (final ent in attachDir.list(followLinks: false)) {
-      if (ent is! File) continue;
-      final name = p.basename(ent.path);
-      if (name.startsWith('.')) continue;
-      FileStat stat;
-      try {
-        stat = await ent.stat();
-      } catch (_) {
-        continue;
-      }
-      final m = meta[_metadata.relKey(ent.path)];
-      out.add(LibraryEntry(
-        path: ent.path,
-        name: name,
-        kind: kindForFile(name),
-        size: stat.size,
-        modified: stat.modified,
-        isFavorite: m?.favorite ?? false,
-        tags: m?.tags ?? const [],
-      ));
-    }
-    return out;
-  }
-
   // --- Create ----------------------------------------------------------------
 
   Future<String> createFolder(String parentPath, String name) async {

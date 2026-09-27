@@ -88,27 +88,25 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
 
     final isRoot = root != null && p.equals(root, _dir);
 
-    final listing = ref.watch(directoryProvider(_dir));
-
     final viewMode = ref.watch(settingsProvider).viewMode;
 
     final sort = ref.watch(browseSortProvider);
 
     final filter = ref.watch(browseFilterProvider);
 
-    // Note attachments are surfaced only when a media filter is active, so the
+    // With a kind filter active, list recursively so matches nested deep in
 
-    // normal folder view stays uncluttered.
+    // sub-folders show up too (consistent with the recursive stat cards, and it
 
-    final showAttachments =
+    // pulls in media attached to notes). The unfiltered "all" view stays a
 
-        filter == EntryKind.image || filter == EntryKind.video;
+    // plain folder listing so normal folder-by-folder browsing is unchanged.
 
-    final attachments = showAttachments
+    final listing = filter == null
 
-        ? (ref.watch(dirAttachmentsProvider(_dir)).value ?? const [])
+        ? ref.watch(directoryProvider(_dir))
 
-        : const <LibraryEntry>[];
+        : ref.watch(dirRecursiveProvider(_dir));
 
 
 
@@ -254,13 +252,7 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
 
                     data: (entries) {
 
-                      final combined = attachments.isEmpty
-
-                          ? entries
-
-                          : [...entries, ...attachments];
-
-                      final visible = _applySortFilter(combined, sort, filter);
+                      final visible = _applySortFilter(entries, sort, filter);
 
                       if (visible.isEmpty) {
 

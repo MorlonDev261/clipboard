@@ -60,13 +60,19 @@ final directoryProvider = StreamProvider.autoDispose
   }
 });
 
-/// Media attached to notes in [dirPath] (the hidden `.attachments` folder),
-/// surfaced only when a media filter is active in the browser.
-final dirAttachmentsProvider = FutureProvider.autoDispose
+/// Recursive listing of everything under [dirPath] (the folder itself and all
+/// its sub-folders), including media attached to notes (the hidden
+/// `.attachments` folders). Used by the browser's kind filters so a filter
+/// reveals matching items nested deep in sub-folders, consistent with the
+/// recursive stat cards.
+final dirRecursiveProvider = FutureProvider.autoDispose
     .family<List<LibraryEntry>, String>((ref, dirPath) async {
   final repo = ref.watch(libraryRepositoryProvider);
   if (repo == null) return const [];
-  return repo.listAttachments(dirPath);
+  // Re-run whenever this folder's live (recursive) listing changes, so items
+  // added/removed deep in a sub-folder appear/disappear automatically.
+  ref.watch(directoryProvider(dirPath));
+  return repo.listAllUnder(dirPath, includeAttachments: true);
 });
 
 /// Trashed entries for the current workspace.
@@ -134,7 +140,7 @@ class LibraryController {
   void _touchIndex() {
     _ref.invalidate(libraryIndexProvider);
     _ref.invalidate(dirStatsProvider); // refresh all folder stat cards
-    _ref.invalidate(dirAttachmentsProvider); // refresh attachment listings
+    _ref.invalidate(dirRecursiveProvider); // refresh recursive filtered views
   }
 
   Future<String> createFolder(String parentPath, String name) async {
