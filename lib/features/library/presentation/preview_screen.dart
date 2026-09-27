@@ -10,6 +10,7 @@ import '../../../core/l10n/app_strings.dart';
 import '../application/library_providers.dart';
 import '../domain/library_entry.dart';
 import 'browse_screen.dart' show confirmDelete;
+import 'widgets/video_preview.dart';
 
 /// Previews a media/other file: images render inline; videos and other files
 /// show info with an "open externally" action.
@@ -96,12 +97,7 @@ class PreviewScreen extends ConsumerWidget {
               actionLabel: strings.open,
               onAction: _openExternally,
             ),
-          EntryKind.video => _Info(
-              icon: Icons.videocam_outlined,
-              text: strings.videoPreviewHint,
-              actionLabel: strings.open,
-              onAction: _openExternally,
-            ),
+          EntryKind.video => VideoPreview(path: path),
           _ => _Info(
               icon: Icons.insert_drive_file_outlined,
               text: p.basename(path),

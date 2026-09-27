@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:path/path.dart' as p;
 import 'package:pasteboard/pasteboard.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../app/constants/app_constants.dart';
 import '../../../core/formatting/list_format.dart';
@@ -363,6 +364,22 @@ class _NoteScreenState extends ConsumerState<NoteScreen> {
     }
   }
 
+  /// Opens the system share sheet with the caption and attached images.
+  Future<void> _share(AppStrings strings, List<String> images) async {
+    final text = _contentController.text;
+    if (text.trim().isEmpty && images.isEmpty) return;
+    try {
+      await SharePlus.instance.share(
+        ShareParams(
+          text: text.isEmpty ? null : text,
+          files: images.map((path) => XFile(path)).toList(),
+        ),
+      );
+    } catch (_) {
+      if (mounted) _snack(strings.genericError);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final strings = ref.watch(appStringsProvider);
@@ -396,6 +413,11 @@ class _NoteScreenState extends ConsumerState<NoteScreen> {
               icon: const Icon(Icons.add_photo_alternate_outlined),
               onPressed: () => _attachPhotos(strings),
             ),
+          IconButton(
+            tooltip: strings.share,
+            icon: const Icon(Icons.ios_share),
+            onPressed: isEmpty ? null : () => _share(strings, images),
+          ),
           CopyMenuButton(
             content: _contentController.text,
             imagePaths: images,

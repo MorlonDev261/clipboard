@@ -154,10 +154,6 @@ class AppStrings {
       );
   String get noteSaved => _t('Note enregistrée.', 'Note saved.');
   String get itemDeleted => _t('Élément supprimé.', 'Item deleted.');
-  String get videoPreviewHint => _t(
-        'Aperçu vidéo bientôt disponible. Le fichier est bien enregistré.',
-        'Video preview coming soon. The file is safely stored.',
-      );
   String folderCreated(String name) =>
       _t('Dossier « $name » créé.', 'Folder "$name" created.');
   String importReport(int ok, int failed) => failed == 0
