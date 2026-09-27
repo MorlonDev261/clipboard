@@ -49,7 +49,6 @@ class AppStrings {
   String get changeWorkspace =>
       _t('Changer de dossier de travail', 'Change working folder');
   String get workspaceFolder => _t('Dossier de travail', 'Working folder');
-  String get openLibrary => _t('Ouvrir la bibliothèque', 'Open library');
 
   // Add menu
   String get newFolder => _t('Nouveau dossier', 'New folder');
@@ -71,7 +70,6 @@ class AppStrings {
   String get noteContent => _t('Contenu (Markdown)', 'Content (Markdown)');
   String get newNoteTitle => _t('Nouvelle note', 'New note');
   String get editNoteTitle => _t('Modifier la note', 'Edit note');
-  String get copyContent => _t('Copier le contenu', 'Copy content');
   String get emptyNoteError =>
       _t('La note ne peut pas être vide.', 'The note cannot be empty.');
   String get attachPhoto => _t('Joindre une photo', 'Attach a photo');
@@ -88,8 +86,6 @@ class AppStrings {
   String get bulletList => _t('Liste à puces', 'Bullet list');
   String get numberedList => _t('Liste numérotée', 'Numbered list');
   String get clearFormatting => _t('Effacer la mise en forme', 'Clear formatting');
-  String get selectTextFirst =>
-      _t('Sélectionnez d\'abord du texte.', 'Select some text first.');
   String get preview => _t('Aperçu', 'Preview');
   String get sent => _t('Envoyé', 'Sent');
 
@@ -97,9 +93,6 @@ class AppStrings {
   String get copyForSocial =>
       _t('Copier pour les réseaux sociaux', 'Copy for social media');
   String get copyPlainText => _t('Copier en texte simple', 'Copy as plain text');
-  String get copyMarkdown => _t('Copier en Markdown', 'Copy as Markdown');
-  String get socialPreviewTitle =>
-      _t('Aperçu réseaux sociaux', 'Social media preview');
   String get copyFailed =>
       _t('Échec de la copie dans le presse-papiers.', 'Failed to copy to clipboard.');
 
@@ -124,8 +117,6 @@ class AppStrings {
       _t('Supprimer définitivement', 'Delete permanently');
 
   // Drag & drop
-  String get dropHint =>
-      _t('Déposez des fichiers ou dossiers ici', 'Drop files or folders here');
   String get dropToImport =>
       _t('Relâchez pour importer', 'Release to import');
 
@@ -145,7 +136,6 @@ class AppStrings {
 
   // Feedback / errors
   String get genericError => _t('Une erreur est survenue.', 'Something went wrong.');
-  String get comingSoon => _t('Bientôt disponible.', 'Coming soon.');
   String get copiedToClipboard =>
       _t('Copié dans le presse-papiers', 'Copied to clipboard');
   String copiedWithFiles(int n) => _t(
@@ -153,7 +143,6 @@ class AppStrings {
         'Text and $n file(s) copied',
       );
   String get noteSaved => _t('Note enregistrée.', 'Note saved.');
-  String get itemDeleted => _t('Élément supprimé.', 'Item deleted.');
   String folderCreated(String name) =>
       _t('Dossier « $name » créé.', 'Folder "$name" created.');
   String importReport(int ok, int failed) => failed == 0
@@ -188,8 +177,6 @@ class AppStrings {
   // Move / duplicate
   String get move => _t('Déplacer', 'Move');
   String get duplicate => _t('Dupliquer', 'Duplicate');
-  String get moved => _t('Déplacé.', 'Moved.');
-  String get duplicated => _t('Dupliqué.', 'Duplicated.');
   String get chooseDestination =>
       _t('Choisir le dossier de destination', 'Choose destination folder');
 
