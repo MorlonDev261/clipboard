@@ -12,7 +12,8 @@ import '../data/trash_store.dart';
 import '../domain/library_entry.dart';
 
 /// Active sort order in the browser (session state).
-final browseSortProvider = StateProvider<SortOption>((ref) => SortOption.nameAsc);
+final browseSortProvider =
+    StateProvider<SortOption>((ref) => SortOption.nameAsc);
 
 /// Active kind filter in the browser; null means "all" (session state).
 final browseFilterProvider = StateProvider<EntryKind?>((ref) => null);
@@ -151,7 +152,8 @@ class LibraryController {
     required String title,
     required String content,
   }) async {
-    final path = await _repo.createNote(dirPath, title: title, content: content);
+    final path =
+        await _repo.createNote(dirPath, title: title, content: content);
     _ref.invalidate(directoryProvider(dirPath));
     _touchIndex();
     return path;
@@ -170,7 +172,8 @@ class LibraryController {
   Future<void> saveNote(String path, String content) =>
       _repo.writeTextFile(path, content);
 
-  Future<String> rename(String path, String newName, {String? parentDir}) async {
+  Future<String> rename(String path, String newName,
+      {String? parentDir}) async {
     final result = await _repo.rename(path, newName);
     if (parentDir != null) _ref.invalidate(directoryProvider(parentDir));
     _touchIndex();
@@ -183,7 +186,8 @@ class LibraryController {
     _touchIndex();
   }
 
-  Future<void> setTags(String path, List<String> tags, {String? parentDir}) async {
+  Future<void> setTags(String path, List<String> tags,
+      {String? parentDir}) async {
     await _repo.setTags(path, tags);
     if (parentDir != null) _ref.invalidate(directoryProvider(parentDir));
     _touchIndex();

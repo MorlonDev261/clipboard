@@ -40,8 +40,9 @@ abstract final class AppFilePicker {
       final dir = await native.FilePicker.getDirectoryPath(dialogTitle: title);
       return dir == null ? const [] : [dir];
     }
-    final type =
-        mode == PickMode.imageFiles ? native.FileType.image : native.FileType.any;
+    final type = mode == PickMode.imageFiles
+        ? native.FileType.image
+        : native.FileType.any;
     final result = await native.FilePicker.pickFiles(
       type: type,
       allowMultiple: allowMultiple,

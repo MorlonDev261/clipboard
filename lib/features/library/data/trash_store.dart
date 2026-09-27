@@ -36,8 +36,8 @@ class TrashEntry {
         originalPath: json['originalPath'] as String,
         trashedPath: json['trashedPath'] as String,
         isDir: json['isDir'] == true,
-        deletedAt:
-            DateTime.tryParse(json['deletedAt'] as String? ?? '') ?? DateTime.now(),
+        deletedAt: DateTime.tryParse(json['deletedAt'] as String? ?? '') ??
+            DateTime.now(),
       );
 }
 
@@ -68,8 +68,8 @@ class TrashStore {
 
   Future<void> _save(List<TrashEntry> entries) async {
     await _index.parent.create(recursive: true);
-    await _index.writeAsString(
-        jsonEncode(entries.map((e) => e.toJson()).toList()));
+    await _index
+        .writeAsString(jsonEncode(entries.map((e) => e.toJson()).toList()));
   }
 
   Future<void> add(TrashEntry entry) async {

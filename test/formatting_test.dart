@@ -32,8 +32,8 @@ void main() {
 
     test('bold+italic uses the bold-italic alphabet', () {
       expect(
-          runes(styler
-              .transform('A', const InlineStyle(bold: true, italic: true))),
+          runes(styler.transform(
+              'A', const InlineStyle(bold: true, italic: true))),
           [0x1D468]);
     });
 
@@ -56,8 +56,8 @@ void main() {
     });
     test('bold + strike', () {
       expect(
-          runes(styler
-              .transform('A', const InlineStyle(bold: true, strike: true))),
+          runes(styler.transform(
+              'A', const InlineStyle(bold: true, strike: true))),
           [0x1D400, 0x0336]);
     });
 
@@ -104,7 +104,8 @@ void main() {
       expect(styler.plainify(bold), 'Prix 2026');
     });
     test('removes strike & underline overlays', () {
-      final struck = styler.transform('Ancien', const InlineStyle(strike: true));
+      final struck =
+          styler.transform('Ancien', const InlineStyle(strike: true));
       expect(styler.plainify(struck), 'Ancien');
       final underlined =
           styler.transform('OFFRE', const InlineStyle(underline: true));
@@ -128,7 +129,8 @@ void main() {
     test('detects bold-italic', () {
       final s =
           styler.transform('X', const InlineStyle(bold: true, italic: true));
-      expect(styler.detectStyle(s), const InlineStyle(bold: true, italic: true));
+      expect(
+          styler.detectStyle(s), const InlineStyle(bold: true, italic: true));
     });
     test('detects overlays', () {
       final s = styler.transform(

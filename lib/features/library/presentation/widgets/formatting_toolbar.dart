@@ -147,7 +147,8 @@ class FormattingToolbar extends ConsumerWidget {
     if (nonEmpty.isEmpty) {
       final prefix = numbered ? ListFormat.numbered(1) : ListFormat.bullet;
       final newText = text.replaceRange(lineStart, lineEnd, prefix);
-      _apply(newText, TextSelection.collapsed(offset: lineStart + prefix.length));
+      _apply(
+          newText, TextSelection.collapsed(offset: lineStart + prefix.length));
       return;
     }
 
@@ -165,8 +166,9 @@ class FormattingToolbar extends ConsumerWidget {
       } else {
         final bare = line.replaceFirst(ListFormat.anyRe, '');
         counter++;
-        result.add((numbered ? ListFormat.numbered(counter) : ListFormat.bullet) +
-            bare);
+        result.add(
+            (numbered ? ListFormat.numbered(counter) : ListFormat.bullet) +
+                bare);
       }
     }
     final newBlock = result.join('\n');
@@ -204,7 +206,8 @@ class FormattingToolbar extends ConsumerWidget {
     final newText = controller.text.replaceRange(start, end, replacement);
     _apply(
       newText,
-      TextSelection(baseOffset: start, extentOffset: start + replacement.length),
+      TextSelection(
+          baseOffset: start, extentOffset: start + replacement.length),
     );
   }
 }

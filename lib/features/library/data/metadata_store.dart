@@ -30,8 +30,7 @@ class MetadataStore {
 
   final String root;
 
-  File get _file =>
-      File(p.join(root, '.clipboard', 'metadata.json'));
+  File get _file => File(p.join(root, '.clipboard', 'metadata.json'));
 
   String relKey(String absolutePath) =>
       p.relative(absolutePath, from: root).replaceAll(r'\', '/');

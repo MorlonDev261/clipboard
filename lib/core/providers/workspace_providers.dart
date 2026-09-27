@@ -20,7 +20,8 @@ class WorkspaceController extends AsyncNotifier<String?> {
 }
 
 final workspaceControllerProvider =
-    AsyncNotifierProvider<WorkspaceController, String?>(WorkspaceController.new);
+    AsyncNotifierProvider<WorkspaceController, String?>(
+        WorkspaceController.new);
 
 /// Convenience: the current root path, or null.
 final workspaceRootProvider = Provider<String?>((ref) {

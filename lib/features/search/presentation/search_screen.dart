@@ -53,11 +53,20 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   String _fold(String s) {
     var out = s.toLowerCase();
     const map = {
-      'à': 'a', 'â': 'a', 'ä': 'a',
-      'é': 'e', 'è': 'e', 'ê': 'e', 'ë': 'e',
-      'î': 'i', 'ï': 'i',
-      'ô': 'o', 'ö': 'o',
-      'ù': 'u', 'û': 'u', 'ü': 'u',
+      'à': 'a',
+      'â': 'a',
+      'ä': 'a',
+      'é': 'e',
+      'è': 'e',
+      'ê': 'e',
+      'ë': 'e',
+      'î': 'i',
+      'ï': 'i',
+      'ô': 'o',
+      'ö': 'o',
+      'ù': 'u',
+      'û': 'u',
+      'ü': 'u',
       'ç': 'c',
     };
     map.forEach((k, v) => out = out.replaceAll(k, v));

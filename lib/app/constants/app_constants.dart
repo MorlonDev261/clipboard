@@ -20,7 +20,13 @@ abstract final class AppConstants {
   static const int maxVideoBytes = 1024 * 1024 * 1024; // 1 GB
   static const int maxTextBytes = 1 * 1024 * 1024; // 1 MB
 
-  static const List<String> imageExtensions = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+  static const List<String> imageExtensions = [
+    'jpg',
+    'jpeg',
+    'png',
+    'webp',
+    'gif'
+  ];
   static const List<String> videoExtensions = ['mp4', 'mov', 'webm', 'avi'];
 
   /// Font used to render note text so the native Unicode styling looks right:

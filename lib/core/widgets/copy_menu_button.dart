@@ -52,7 +52,8 @@ class CopyMenuButton extends ConsumerWidget {
     return PopupMenuButton<CopyMode>(
       icon: const Icon(Icons.copy),
       tooltip: strings.copy,
-      onSelected: (mode) => _copy(context, strings, _clip.render(mode, content)),
+      onSelected: (mode) =>
+          _copy(context, strings, _clip.render(mode, content)),
       itemBuilder: (context) => [
         PopupMenuItem(
           value: CopyMode.social,

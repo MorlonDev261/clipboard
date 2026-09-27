@@ -42,8 +42,7 @@ class LibraryEntry {
   bool get isMedia => isImage || isVideo;
 
   /// Display name without the `.md` extension for notes.
-  String get displayName =>
-      isNote ? p.basenameWithoutExtension(name) : name;
+  String get displayName => isNote ? p.basenameWithoutExtension(name) : name;
 
   @override
   bool operator ==(Object other) => other is LibraryEntry && other.path == path;
@@ -54,8 +53,19 @@ class LibraryEntry {
 
 /// File extensions recognised as images and videos.
 const imageExtensions = {
-  '.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp',
-  '.heic', '.heif', '.svg', '.tiff', '.tif', '.avif', '.ico',
+  '.jpg',
+  '.jpeg',
+  '.png',
+  '.webp',
+  '.gif',
+  '.bmp',
+  '.heic',
+  '.heif',
+  '.svg',
+  '.tiff',
+  '.tif',
+  '.avif',
+  '.ico',
 };
 const videoExtensions = {'.mp4', '.mov', '.webm', '.avi', '.mkv', '.m4v'};
 const noteExtensions = {'.md', '.markdown', '.txt'};
@@ -64,7 +74,12 @@ const noteExtensions = {'.md', '.markdown', '.txt'};
 /// Other recognised image formats (heic, svg, tiff, avif, ico) still count as
 /// images but fall back to an icon instead of a rendered preview.
 const decodableImageExtensions = {
-  '.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp',
+  '.jpg',
+  '.jpeg',
+  '.png',
+  '.webp',
+  '.gif',
+  '.bmp',
 };
 
 /// Whether a file can be shown as a rendered thumbnail (vs. an image icon).

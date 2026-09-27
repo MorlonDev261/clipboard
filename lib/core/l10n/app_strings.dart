@@ -85,16 +85,18 @@ class AppStrings {
   String get monospace => _t('Code / chasse fixe', 'Code / monospace');
   String get bulletList => _t('Liste à puces', 'Bullet list');
   String get numberedList => _t('Liste numérotée', 'Numbered list');
-  String get clearFormatting => _t('Effacer la mise en forme', 'Clear formatting');
+  String get clearFormatting =>
+      _t('Effacer la mise en forme', 'Clear formatting');
   String get preview => _t('Aperçu', 'Preview');
   String get sent => _t('Envoyé', 'Sent');
 
   // Copy modes
   String get copyForSocial =>
       _t('Copier pour les réseaux sociaux', 'Copy for social media');
-  String get copyPlainText => _t('Copier en texte simple', 'Copy as plain text');
-  String get copyFailed =>
-      _t('Échec de la copie dans le presse-papiers.', 'Failed to copy to clipboard.');
+  String get copyPlainText =>
+      _t('Copier en texte simple', 'Copy as plain text');
+  String get copyFailed => _t('Échec de la copie dans le presse-papiers.',
+      'Failed to copy to clipboard.');
 
   // Dialogs
   String get nameLabel => _t('Nom', 'Name');
@@ -106,8 +108,7 @@ class AppStrings {
         'Il sera déplacé vers la corbeille.',
         'It will be moved to the trash.',
       );
-  String get emptyTrashTitle =>
-      _t('Vider la corbeille ?', 'Empty the trash?');
+  String get emptyTrashTitle => _t('Vider la corbeille ?', 'Empty the trash?');
   String get emptyTrashMessage => _t(
         'Tous les éléments seront supprimés définitivement.',
         'All items will be permanently deleted.',
@@ -117,8 +118,7 @@ class AppStrings {
       _t('Supprimer définitivement', 'Delete permanently');
 
   // Drag & drop
-  String get dropToImport =>
-      _t('Relâchez pour importer', 'Release to import');
+  String get dropToImport => _t('Relâchez pour importer', 'Release to import');
 
   // Empty states
   String get emptyFolderTitle => _t('Dossier vide', 'Empty folder');
@@ -135,7 +135,8 @@ class AppStrings {
       _t('Retirer des favoris', 'Remove from favorites');
 
   // Feedback / errors
-  String get genericError => _t('Une erreur est survenue.', 'Something went wrong.');
+  String get genericError =>
+      _t('Une erreur est survenue.', 'Something went wrong.');
   String get copiedToClipboard =>
       _t('Copié dans le presse-papiers', 'Copied to clipboard');
   String copiedWithFiles(int n) => _t(
@@ -147,7 +148,8 @@ class AppStrings {
       _t('Dossier « $name » créé.', 'Folder "$name" created.');
   String importReport(int ok, int failed) => failed == 0
       ? _t('$ok élément(s) importé(s).', '$ok item(s) imported.')
-      : _t('$ok importé(s), $failed échec(s).', '$ok imported, $failed failed.');
+      : _t(
+          '$ok importé(s), $failed échec(s).', '$ok imported, $failed failed.');
 
   // Search
   String get searchHint =>
@@ -202,7 +204,8 @@ class AppStrings {
       _t('Sélectionner des fichiers', 'Select files');
   String get selectImagesTitle =>
       _t('Sélectionner des photos', 'Select photos');
-  String get multipleSelection => _t('Sélection multiple', 'Multiple selection');
+  String get multipleSelection =>
+      _t('Sélection multiple', 'Multiple selection');
   String get chooseThisFolder => _t('Choisir ce dossier', 'Choose this folder');
   String get parentFolder => _t('Dossier parent', 'Parent folder');
   String get importAction => _t('Importer', 'Import');

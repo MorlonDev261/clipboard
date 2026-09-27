@@ -48,9 +48,8 @@ class FavoritesScreen extends ConsumerWidget {
             itemCount: items.length,
             itemBuilder: (context, i) {
               final e = items[i];
-              final folder = root == null
-                  ? ''
-                  : p.dirname(p.relative(e.path, from: root));
+              final folder =
+                  root == null ? '' : p.dirname(p.relative(e.path, from: root));
               return ListTile(
                 leading: Icon(_iconFor(e.kind)),
                 title: Text(e.displayName),

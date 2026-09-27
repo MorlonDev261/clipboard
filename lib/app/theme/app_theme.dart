@@ -36,7 +36,8 @@ abstract final class AppTheme {
         color: colorScheme.surface,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
+          side: BorderSide(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(

@@ -88,8 +88,7 @@ class ChatPreviewDialog extends ConsumerWidget {
                                   .labelSmall
                                   ?.copyWith(color: scheme.onSurfaceVariant)),
                           const SizedBox(width: 4),
-                          Icon(Icons.done_all,
-                              size: 14, color: scheme.primary),
+                          Icon(Icons.done_all, size: 14, color: scheme.primary),
                         ],
                       ),
                     ),
@@ -115,8 +114,8 @@ class _OutgoingTextBubble extends StatelessWidget {
     return Align(
       alignment: Alignment.centerRight,
       child: ConstrainedBox(
-        constraints: BoxConstraints(
-            maxWidth: MediaQuery.sizeOf(context).width * 0.78),
+        constraints:
+            BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.78),
         child: Container(
           margin: const EdgeInsets.symmetric(vertical: 3),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),

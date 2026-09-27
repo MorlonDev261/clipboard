@@ -417,7 +417,8 @@ class _ShortcutsBar extends StatelessWidget {
         separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (context, i) {
           final s = shortcuts[i];
-          final selected = currentPath != null && p.equals(currentPath!, s.path);
+          final selected =
+              currentPath != null && p.equals(currentPath!, s.path);
           return ActionChip(
             avatar: Icon(s.icon, size: 18),
             label: Text(s.label),

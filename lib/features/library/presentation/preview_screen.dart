@@ -40,8 +40,8 @@ class PreviewScreen extends ConsumerWidget {
     final listing = ref.watch(directoryProvider(parent));
     final controller = ref.read(libraryControllerProvider);
 
-    final entry = listing.value
-        ?.firstWhereOrNull((e) => p.equals(e.path, path));
+    final entry =
+        listing.value?.firstWhereOrNull((e) => p.equals(e.path, path));
 
     final kind = entry?.kind ?? kindForFile(p.basename(path));
     final isFavorite = entry?.isFavorite ?? false;
@@ -87,8 +87,9 @@ class PreviewScreen extends ConsumerWidget {
               maxScale: 5,
               child: Image.file(
                 File(path),
-                errorBuilder: (_, __, ___) =>
-                    _Info(icon: Icons.broken_image_outlined, text: strings.genericError),
+                errorBuilder: (_, __, ___) => _Info(
+                    icon: Icons.broken_image_outlined,
+                    text: strings.genericError),
               ),
             ),
           EntryKind.image => _Info(

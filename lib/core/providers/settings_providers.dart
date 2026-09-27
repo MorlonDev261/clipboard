@@ -42,6 +42,5 @@ final settingsControllerProvider =
 
 /// Convenience: current settings (defaults until loaded).
 final settingsProvider = Provider<AppSettings>((ref) {
-  return ref.watch(settingsControllerProvider).value ??
-      const AppSettings();
+  return ref.watch(settingsControllerProvider).value ?? const AppSettings();
 });

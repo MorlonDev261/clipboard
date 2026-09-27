@@ -58,8 +58,7 @@ class _NoteScreenState extends ConsumerState<NoteScreen> {
   bool get _isEditing => widget.existingPath != null;
 
   /// The folder the note lives in (known even for a not-yet-saved note).
-  String get _dir =>
-      widget.newDir ?? p.dirname(widget.existingPath!);
+  String get _dir => widget.newDir ?? p.dirname(widget.existingPath!);
 
   static final _imageLinkRegExp = RegExp(r'!\[[^\]]*\]\(([^)]+)\)');
 
@@ -182,8 +181,9 @@ class _NoteScreenState extends ConsumerState<NoteScreen> {
   Future<void> _loadContent() async {
     setState(() => _loading = true);
     try {
-      final raw =
-          await ref.read(libraryControllerProvider).readNote(widget.existingPath!);
+      final raw = await ref
+          .read(libraryControllerProvider)
+          .readNote(widget.existingPath!);
       final (body, tags) = _splitBodyAndImages(raw);
       _imageTags
         ..clear()
@@ -276,8 +276,9 @@ class _NoteScreenState extends ConsumerState<NoteScreen> {
       builder: (context) => Dialog(
         child: InteractiveViewer(
           child: Image.file(File(path),
-              errorBuilder: (_, __, ___) =>
-                  const Padding(padding: EdgeInsets.all(24), child: Icon(Icons.broken_image_outlined))),
+              errorBuilder: (_, __, ___) => const Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Icon(Icons.broken_image_outlined))),
         ),
       ),
     );
@@ -384,7 +385,8 @@ class _NoteScreenState extends ConsumerState<NoteScreen> {
   Widget build(BuildContext context) {
     final strings = ref.watch(appStringsProvider);
     final images = _attachedImages();
-    final isEmpty = _contentController.text.trim().isEmpty && _imageTags.isEmpty;
+    final isEmpty =
+        _contentController.text.trim().isEmpty && _imageTags.isEmpty;
 
     return Scaffold(
       appBar: AppBar(

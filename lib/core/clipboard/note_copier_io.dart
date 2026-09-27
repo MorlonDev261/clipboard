@@ -79,10 +79,8 @@ String _buildHtml(String text, List<_Image> images) {
   return sb.toString();
 }
 
-String _escapeHtml(String s) => s
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;');
+String _escapeHtml(String s) =>
+    s.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 
 String _mime(String name) {
   switch (p.extension(name).toLowerCase()) {
