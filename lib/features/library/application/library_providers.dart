@@ -101,14 +101,10 @@ typedef DirStats = ({int folders, int images, int videos, int notes});
 
 final dirStatsProvider =
     FutureProvider.autoDispose.family<DirStats, String>((ref, dirPath) async {
-  final repo = ref.watch(libraryRepositoryProvider);
-  if (repo == null) return (folders: 0, images: 0, videos: 0, notes: 0);
-  // Recompute whenever this folder's live listing changes. The watcher is
-  // recursive, so adding/removing items inside a sub-folder refreshes the
-  // counts too (they already count sub-folders recursively).
-  ref.watch(directoryProvider(dirPath));
-  // Include note attachments so images/videos attached to notes are counted.
-  final all = await repo.listAllUnder(dirPath, includeAttachments: true);
+  // Derived from the single recursive listing (which already includes note
+  // attachments and refreshes on any change under the folder), so the walk is
+  // done once and shared with the browser's filtered view.
+  final all = await ref.watch(dirRecursiveProvider(dirPath).future);
   return (
     folders: all.where((e) => e.isFolder).length,
     images: all.where((e) => e.isImage).length,
