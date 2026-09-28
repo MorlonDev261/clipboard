@@ -11,5 +11,6 @@ Future<List<String>> launchInAppBrowser(
   bool allowMultiple = true,
   String? title,
   String? initialDirectory,
+  String? actionLabel,
 }) async =>
     const [];

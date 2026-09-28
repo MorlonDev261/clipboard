@@ -448,6 +448,15 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
               },
             ),
             ListTile(
+              leading: const Icon(Icons.drive_file_move_outlined),
+              title: Text(strings.moveFilesIn),
+              onTap: () {
+                Navigator.pop(sheetContext);
+
+                _pickAndMove();
+              },
+            ),
+            ListTile(
               leading: const Icon(Icons.upload_file_outlined),
               title: Text(strings.importFiles),
               onTap: () {
@@ -498,16 +507,36 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
     }
   }
 
-  Future<void> _import(List<String> paths) async {
+  /// Like [_pickAndImport], but cuts the picked files out of their original
+  /// location instead of leaving a copy behind.
+  Future<void> _pickAndMove() async {
+    final strings = ref.read(appStringsProvider);
+
+    final paths = await AppFilePicker.pick(
+      context,
+      mode: PickMode.files,
+      title: strings.moveFilesIn,
+      actionLabel: strings.move,
+    );
+
+    if (paths.isNotEmpty) {
+      await _import(paths, move: true);
+    }
+  }
+
+  Future<void> _import(List<String> paths, {bool move = false}) async {
     final strings = ref.read(appStringsProvider);
 
     try {
-      final failed =
-          await ref.read(libraryControllerProvider).importPaths(_dir, paths);
+      final failed = await ref
+          .read(libraryControllerProvider)
+          .importPaths(_dir, paths, move: move);
 
       if (mounted) {
-        _snack(
-            strings.importReport(paths.length - failed.length, failed.length));
+        final ok = paths.length - failed.length;
+        _snack(move
+            ? strings.moveInReport(ok, failed.length)
+            : strings.importReport(ok, failed.length));
       }
     } catch (_) {
       if (mounted) _snack(strings.genericError);

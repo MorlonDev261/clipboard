@@ -258,9 +258,10 @@ class LibraryRepository {
   // --- Import (copy into the workspace) --------------------------------------
 
   /// Copies files/folders into [destDir]. Continues on individual failures and
-  /// returns the list of paths that failed.
-  Future<List<String>> importPaths(
-      String destDir, List<String> sourcePaths) async {
+  /// returns the list of paths that failed. With [move], each source is
+  /// removed once it has been copied in (cut instead of copy).
+  Future<List<String>> importPaths(String destDir, List<String> sourcePaths,
+      {bool move = false}) async {
     final failed = <String>[];
     for (final src in sourcePaths) {
       try {
@@ -268,8 +269,10 @@ class LibraryRepository {
         switch (type) {
           case FileSystemEntityType.directory:
             await _copyDirectory(src, p.join(destDir, p.basename(src)));
+            if (move) await Directory(src).delete(recursive: true);
           case FileSystemEntityType.file:
             await _copyFileInto(destDir, src);
+            if (move) await File(src).delete();
           default:
             // Missing, a link, or otherwise not something we can copy.
             failed.add(src);

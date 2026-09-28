@@ -193,9 +193,9 @@ class LibraryController {
     _touchIndex();
   }
 
-  Future<List<String>> importPaths(
-      String destDir, List<String> sourcePaths) async {
-    final failed = await _repo.importPaths(destDir, sourcePaths);
+  Future<List<String>> importPaths(String destDir, List<String> sourcePaths,
+      {bool move = false}) async {
+    final failed = await _repo.importPaths(destDir, sourcePaths, move: move);
     _ref.invalidate(directoryProvider(destDir));
     _touchIndex();
     return failed;

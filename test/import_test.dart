@@ -53,13 +53,11 @@ void main() {
     expect(
         await File(p.join(workspace.path, 'album', 'a.png')).exists(), isTrue);
     expect(
-        await File(p.join(workspace.path, 'album', 'nested', 'b.png'))
-            .exists(),
+        await File(p.join(workspace.path, 'album', 'nested', 'b.png')).exists(),
         isTrue);
   });
 
-  test('importPaths avoids collisions by incrementing the copy name',
-      () async {
+  test('importPaths avoids collisions by incrementing the copy name', () async {
     File(p.join(workspace.path, 'doc.txt')).writeAsStringSync('existing');
     final src = File(p.join(outside.path, 'doc.txt'))
       ..writeAsStringSync('incoming');
@@ -69,8 +67,7 @@ void main() {
     expect(failed, isEmpty);
     expect(await File(p.join(workspace.path, 'doc.txt')).readAsString(),
         'existing');
-    expect(
-        await File(p.join(workspace.path, 'doc (1).txt')).readAsString(),
+    expect(await File(p.join(workspace.path, 'doc (1).txt')).readAsString(),
         'incoming');
   });
 
@@ -83,12 +80,37 @@ void main() {
     expect(failed, [missing]);
   });
 
+  test('importPaths with move deletes the source file after copying', () async {
+    final src = File(p.join(outside.path, 'photo.jpg'))
+      ..writeAsBytesSync([1, 2, 3]);
+
+    final failed =
+        await repo.importPaths(workspace.path, [src.path], move: true);
+
+    expect(failed, isEmpty);
+    expect(await File(p.join(workspace.path, 'photo.jpg')).readAsBytes(),
+        [1, 2, 3]);
+    expect(await src.exists(), isFalse);
+  });
+
+  test('importPaths with move deletes the source folder after copying',
+      () async {
+    final srcDir = Directory(p.join(outside.path, 'album'))..createSync();
+    File(p.join(srcDir.path, 'a.png')).writeAsBytesSync([1]);
+
+    final failed =
+        await repo.importPaths(workspace.path, [srcDir.path], move: true);
+
+    expect(failed, isEmpty);
+    expect(
+        await File(p.join(workspace.path, 'album', 'a.png')).exists(), isTrue);
+    expect(await srcDir.exists(), isFalse);
+  });
+
   test('importPaths imports several files in one call, skipping failures',
       () async {
-    final ok1 = File(p.join(outside.path, 'one.txt'))
-      ..writeAsStringSync('1');
-    final ok2 = File(p.join(outside.path, 'two.txt'))
-      ..writeAsStringSync('2');
+    final ok1 = File(p.join(outside.path, 'one.txt'))..writeAsStringSync('1');
+    final ok2 = File(p.join(outside.path, 'two.txt'))..writeAsStringSync('2');
     final missing = p.join(outside.path, 'missing.txt');
 
     final failed = await repo.importPaths(

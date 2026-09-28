@@ -17,6 +17,7 @@ Future<List<String>> launchInAppBrowser(
   bool allowMultiple = true,
   String? title,
   String? initialDirectory,
+  String? actionLabel,
 }) async {
   final result = await Navigator.of(context).push<List<String>>(
     MaterialPageRoute(
@@ -26,6 +27,7 @@ Future<List<String>> launchInAppBrowser(
         allowMultiple: allowMultiple,
         title: title,
         initialDirectory: initialDirectory,
+        actionLabel: actionLabel,
       ),
     ),
   );
@@ -38,12 +40,14 @@ class _FileBrowserScreen extends ConsumerStatefulWidget {
     required this.allowMultiple,
     this.title,
     this.initialDirectory,
+    this.actionLabel,
   });
 
   final PickMode mode;
   final bool allowMultiple;
   final String? title;
   final String? initialDirectory;
+  final String? actionLabel;
 
   @override
   ConsumerState<_FileBrowserScreen> createState() => _FileBrowserScreenState();
@@ -268,8 +272,10 @@ class _FileBrowserScreenState extends ConsumerState<_FileBrowserScreen> {
     if (cur != null) Navigator.of(context).pop(<String>[cur.path]);
   }
 
-  String _confirmLabel(AppStrings s) =>
-      widget.mode == PickMode.imageFiles ? s.selectAction : s.importAction;
+  String _confirmLabel(AppStrings s) {
+    if (widget.actionLabel != null) return widget.actionLabel!;
+    return widget.mode == PickMode.imageFiles ? s.selectAction : s.importAction;
+  }
 
   // --- Build -----------------------------------------------------------------
 

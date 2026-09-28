@@ -69,6 +69,7 @@ class AppStrings {
   String get newFolder => _t('Nouveau dossier', 'New folder');
   String get newNote => _t('Nouvelle note', 'New note');
   String get importFiles => _t('Importer des fichiers', 'Import files');
+  String get moveFilesIn => _t('Déplacer des fichiers', 'Move files in');
 
   // Content categories
   String get folders => _t('Dossiers', 'Folders');
@@ -165,6 +166,9 @@ class AppStrings {
       ? _t('$ok élément(s) importé(s).', '$ok item(s) imported.')
       : _t(
           '$ok importé(s), $failed échec(s).', '$ok imported, $failed failed.');
+  String moveInReport(int ok, int failed) => failed == 0
+      ? _t('$ok élément(s) déplacé(s).', '$ok item(s) moved.')
+      : _t('$ok déplacé(s), $failed échec(s).', '$ok moved, $failed failed.');
 
   // Search
   String get searchHint =>
