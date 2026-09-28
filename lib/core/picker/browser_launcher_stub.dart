@@ -10,5 +10,6 @@ Future<List<String>> launchInAppBrowser(
   required PickMode mode,
   bool allowMultiple = true,
   String? title,
+  String? initialDirectory,
 }) async =>
     const [];

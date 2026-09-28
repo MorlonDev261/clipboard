@@ -21,6 +21,7 @@ abstract final class AppFilePicker {
     required PickMode mode,
     bool allowMultiple = true,
     String? title,
+    String? initialDirectory,
   }) {
     if (kIsWeb) return _native(mode, allowMultiple, title);
     return launcher.launchInAppBrowser(
@@ -28,6 +29,7 @@ abstract final class AppFilePicker {
       mode: mode,
       allowMultiple: allowMultiple,
       title: title,
+      initialDirectory: initialDirectory,
     );
   }
 

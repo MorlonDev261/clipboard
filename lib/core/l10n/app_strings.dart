@@ -234,6 +234,11 @@ class AppStrings {
   String get locationDocuments => _t('Documents', 'Documents');
   String get locationDownloads => _t('Téléchargements', 'Downloads');
   String nSelected(int n) => _t('$n sélectionné(s)', '$n selected');
+  String get selectAll => _t('Tout sélectionner', 'Select all');
+  String get moveHere => _t('Déplacer ici', 'Move here');
+  String nMoved(int n) => _t('$n élément(s) déplacé(s)', '$n item(s) moved');
+  String nDeleted(int n) =>
+      _t('$n élément(s) supprimé(s)', '$n item(s) deleted');
 }
 
 /// Current app strings, following the language chosen in settings (French by

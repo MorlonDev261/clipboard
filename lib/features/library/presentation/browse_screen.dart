@@ -70,7 +70,118 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
 
   String _searchQuery = '';
 
+  /// Paths currently selected for a batch action (move / delete). Selection
+  /// mode is active whenever this is non-empty.
+  final Set<String> _selected = <String>{};
+
+  bool get _selecting => _selected.isNotEmpty;
+
+  /// The entries currently shown in the list (kept so "select all" can act on
+  /// exactly what is visible, filters included).
+  List<LibraryEntry> _visible = const [];
+
   String get _dir => widget.dirPath;
+
+  void _toggleSelect(String path) {
+    setState(() {
+      if (!_selected.remove(path)) _selected.add(path);
+    });
+  }
+
+  void _startSelection(String path) {
+    setState(() => _selected.add(path));
+  }
+
+  void _clearSelection() {
+    if (_selected.isEmpty) return;
+    setState(_selected.clear);
+  }
+
+  void _selectAll(List<LibraryEntry> entries) {
+    setState(() {
+      _selected
+        ..clear()
+        ..addAll(entries.map((e) => e.path));
+    });
+  }
+
+  /// Moves every selected entry into a destination folder chosen inside the
+  /// workspace, then leaves selection mode.
+  Future<void> _moveSelected() async {
+    final strings = ref.read(appStringsProvider);
+    final paths = _selected.toList();
+    if (paths.isEmpty) return;
+    final dests = await AppFilePicker.pick(
+      context,
+      mode: PickMode.directory,
+      title: strings.chooseDestination,
+      initialDirectory: ref.read(workspaceRootProvider) ?? _dir,
+    );
+    if (dests.isEmpty) return;
+    final dest = dests.first;
+    final controller = ref.read(libraryControllerProvider);
+    var moved = 0;
+    for (final path in paths) {
+      if (p.equals(dest, path) || p.equals(dest, p.dirname(path))) continue;
+      try {
+        await controller.move(path, dest, parentDir: _dir);
+        moved++;
+      } catch (_) {/* skip entries that can't be moved */}
+    }
+    _clearSelection();
+    if (mounted) _snack(strings.nMoved(moved));
+  }
+
+  /// Sends every selected entry to the trash, then leaves selection mode.
+  Future<void> _deleteSelected() async {
+    final strings = ref.read(appStringsProvider);
+    final paths = _selected.toList();
+    if (paths.isEmpty) return;
+    final ok = await confirmDelete(context, strings);
+    if (ok != true) return;
+    final controller = ref.read(libraryControllerProvider);
+    var deleted = 0;
+    for (final path in paths) {
+      try {
+        await controller.moveToTrash(path, parentDir: _dir);
+        deleted++;
+      } catch (_) {/* skip entries that can't be deleted */}
+    }
+    _clearSelection();
+    if (mounted) _snack(strings.nDeleted(deleted));
+  }
+
+  /// The app bar shown while items are selected: count, close, select-all,
+  /// move and delete.
+  AppBar _buildSelectionBar(AppStrings strings) {
+    final allSelected =
+        _visible.isNotEmpty && _selected.length >= _visible.length;
+    return AppBar(
+      leading: IconButton(
+        icon: const Icon(Icons.close),
+        tooltip: strings.cancel,
+        onPressed: _clearSelection,
+      ),
+      title: Text(strings.nSelected(_selected.length)),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.select_all),
+          tooltip: strings.selectAll,
+          onPressed: allSelected ? _clearSelection : () => _selectAll(_visible),
+        ),
+        IconButton(
+          icon: const Icon(Icons.drive_file_move_outlined),
+          tooltip: strings.move,
+          onPressed: _moveSelected,
+        ),
+        IconButton(
+          icon: const Icon(Icons.delete_outline),
+          tooltip: strings.delete,
+          onPressed: _deleteSelected,
+        ),
+      ],
+    );
+  }
 
   @override
   void dispose() {
@@ -138,7 +249,9 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
         : const AppHeaderTitle();
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: _selecting
+          ? _buildSelectionBar(strings)
+          : AppBar(
         automaticallyImplyLeading: !_searchOpen && widget.showBack,
         titleSpacing: _searchOpen ? 0.0 : null,
         leading: _searchOpen
@@ -224,7 +337,7 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
                 ),
               ],
       ),
-      floatingActionButton: _searchOpen
+      floatingActionButton: _searchOpen || _selecting
           ? null
           : FloatingActionButton.extended(
               onPressed: () => _showAddSheet(context),
@@ -270,13 +383,21 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
                             final visible = filter == null
                                 ? sortEntries(entries, sort)
                                 : entriesForFilter(entries, _dir, filter);
+                            _visible = visible;
 
                             if (visible.isEmpty) {
                               return _EmptyBrowse(dropping: _dragging);
                             }
 
                             return _EntryView(
-                                dir: _dir, entries: visible, viewMode: viewMode);
+                              dir: _dir,
+                              entries: visible,
+                              viewMode: viewMode,
+                              selected: _selected,
+                              selecting: _selecting,
+                              onToggle: _toggleSelect,
+                              onStartSelection: _startSelection,
+                            );
                           },
                         ),
                       ),
@@ -667,6 +788,10 @@ class _EntryView extends ConsumerWidget {
     required this.dir,
     required this.entries,
     required this.viewMode,
+    required this.selected,
+    required this.selecting,
+    required this.onToggle,
+    required this.onStartSelection,
   });
 
   final String dir;
@@ -674,6 +799,30 @@ class _EntryView extends ConsumerWidget {
   final List<LibraryEntry> entries;
 
   final ViewMode viewMode;
+
+  final Set<String> selected;
+
+  final bool selecting;
+
+  final void Function(String path) onToggle;
+
+  final void Function(String path) onStartSelection;
+
+  void _tap(BuildContext context, LibraryEntry e) {
+    if (selecting) {
+      onToggle(e.path);
+    } else {
+      _open(context, e);
+    }
+  }
+
+  void _longPress(LibraryEntry e) {
+    if (selecting) {
+      onToggle(e.path);
+    } else {
+      onStartSelection(e.path);
+    }
+  }
 
   void _open(BuildContext context, LibraryEntry e) {
     if (e.isFolder) {
