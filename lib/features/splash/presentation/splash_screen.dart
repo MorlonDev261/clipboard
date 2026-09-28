@@ -36,19 +36,23 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   Widget build(BuildContext context) {
     final strings = ref.watch(appStringsProvider);
     final scheme = Theme.of(context).colorScheme;
+    // The logo sits at the exact centre — the same spot as the Android system
+    // splash icon — so the hand-off from the system splash shows no jump; only
+    // the name appears just below it.
     return Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Image.asset(
+      body: Stack(
+        children: [
+          Center(
+            child: Image.asset(
               'assets/icon/icon.png',
-              width: 128,
-              height: 128,
+              width: 132,
+              height: 132,
               filterQuality: FilterQuality.medium,
             ),
-            const SizedBox(height: 16),
-            Text(
+          ),
+          Align(
+            alignment: const Alignment(0, 0.16),
+            child: Text(
               strings.appName,
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     color: scheme.primary,
@@ -56,8 +60,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                     letterSpacing: 0.5,
                   ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

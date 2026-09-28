@@ -1,12 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Android 12+ (API 31) launch theme: hide the system splash icon (via a
-         transparent animated icon) so the app shows a single Flutter splash
-         with the logo and name, instead of the system icon then the Flutter
-         splash. -->
+    <!-- Android 12+ (API 31) launch theme: show the logo on the system splash
+         (the default launcher icon) over the app's background colour, so the
+         logo is visible immediately — no blank screen — and the Flutter splash
+         then continues with the logo and the app name. -->
     <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
         <item name="android:windowSplashScreenBackground">@color/splashBackground</item>
-        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_icon_transparent</item>
         <item name="android:windowBackground">@drawable/launch_background</item>
     </style>
     <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
