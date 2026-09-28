@@ -265,10 +265,14 @@ class LibraryRepository {
     for (final src in sourcePaths) {
       try {
         final type = await FileSystemEntity.type(src);
-        if (type == FileSystemEntityType.directory) {
-          await _copyDirectory(src, p.join(destDir, p.basename(src)));
-        } else if (type == FileSystemEntityType.file) {
-          await _copyFileInto(destDir, src);
+        switch (type) {
+          case FileSystemEntityType.directory:
+            await _copyDirectory(src, p.join(destDir, p.basename(src)));
+          case FileSystemEntityType.file:
+            await _copyFileInto(destDir, src);
+          default:
+            // Missing, a link, or otherwise not something we can copy.
+            failed.add(src);
         }
       } catch (_) {
         failed.add(src);
