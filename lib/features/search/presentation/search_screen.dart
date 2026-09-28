@@ -12,6 +12,7 @@ import '../../../core/providers/workspace_providers.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../library/application/library_providers.dart';
 import '../../library/domain/library_entry.dart';
+import '../application/entry_search.dart';
 
 /// Global search over the whole workspace (names + tags), with a kind filter
 /// and a 300 ms debounce.
@@ -53,37 +54,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     _debounce = Timer(AppConstants.searchDebounce, () {
       if (mounted) setState(() => _query = value.trim());
     });
-  }
-
-  /// Accent- and case-insensitive contains.
-  bool _matches(LibraryEntry e, String q) {
-    if (q.isEmpty) return true;
-    final needle = _fold(q);
-    if (_fold(e.displayName).contains(needle)) return true;
-    return e.tags.any((t) => _fold(t).contains(needle));
-  }
-
-  String _fold(String s) {
-    var out = s.toLowerCase();
-    const map = {
-      'à': 'a',
-      'â': 'a',
-      'ä': 'a',
-      'é': 'e',
-      'è': 'e',
-      'ê': 'e',
-      'ë': 'e',
-      'î': 'i',
-      'ï': 'i',
-      'ô': 'o',
-      'ö': 'o',
-      'ù': 'u',
-      'û': 'u',
-      'ü': 'u',
-      'ç': 'c',
-    };
-    map.forEach((k, v) => out = out.replaceAll(k, v));
-    return out;
   }
 
   void _open(LibraryEntry e) {
@@ -138,7 +108,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               data: (all) {
                 final results = all
                     .where((e) => _filter == null || e.kind == _filter)
-                    .where((e) => _matches(e, _query))
+                    .where((e) => entryMatchesQuery(e, _query))
                     .toList();
                 if (_query.isEmpty && _filter == null) {
                   return EmptyState(

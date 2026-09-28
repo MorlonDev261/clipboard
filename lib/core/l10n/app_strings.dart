@@ -46,6 +46,7 @@ class AppStrings {
   String get restore => _t('Restaurer', 'Restore');
   String get rename => _t('Renommer', 'Rename');
   String get cancel => _t('Annuler', 'Cancel');
+  String get clear => _t('Effacer', 'Clear');
   String get create => _t('Créer', 'Create');
   String get save => _t('Enregistrer', 'Save');
   String get edit => _t('Modifier', 'Edit');

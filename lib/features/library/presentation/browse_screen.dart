@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'dart:io';
 
 import 'package:desktop_drop/desktop_drop.dart';
@@ -28,6 +30,8 @@ import '../../../core/widgets/empty_state.dart';
 
 import '../../../shared/enums/enums.dart';
 
+import '../../search/application/entry_search.dart';
+
 import '../application/browse_filtering.dart';
 
 import '../application/library_providers.dart';
@@ -55,16 +59,48 @@ class BrowseScreen extends ConsumerStatefulWidget {
 
 class _BrowseScreenState extends ConsumerState<BrowseScreen> {
   bool _dragging = false;
-  bool _searching = false;
+
+  bool _searchOpen = false;
+
+  final _searchController = TextEditingController();
+
+  Timer? _searchDebounce;
+
+  String _searchQuery = '';
 
   String get _dir => widget.dirPath;
 
-  void _openSearch() => setState(() => _searching = true);
-  void _closeSearch() => setState(() => _searching = false);
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
 
-  void _submitSearch(String query) {
-    setState(() => _searching = false);
-    context.push(searchRoute(query));
+    _searchController.dispose();
+
+    super.dispose();
+  }
+
+  void _openSearch() {
+    setState(() => _searchOpen = true);
+  }
+
+  void _closeSearch() {
+    _searchDebounce?.cancel();
+
+    _searchController.clear();
+
+    setState(() {
+      _searchOpen = false;
+
+      _searchQuery = '';
+    });
+  }
+
+  void _onSearchChanged(String value) {
+    _searchDebounce?.cancel();
+
+    _searchDebounce = Timer(AppConstants.searchDebounce, () {
+      if (mounted) setState(() => _searchQuery = value.trim());
+    });
   }
 
   @override
@@ -95,19 +131,35 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
         ? ref.watch(directoryProvider(_dir))
         : ref.watch(dirRecursiveProvider(_dir));
 
+    final titleWidget = widget.showBack
+        ? Text(isRoot ? strings.library : p.basename(_dir))
+        : Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Image.asset(
+                'assets/icon/icon.png',
+                width: 28,
+                height: 28,
+                filterQuality: FilterQuality.medium,
+              ),
+              const SizedBox(width: 8),
+              Text(strings.appName),
+            ],
+          );
+
     return Scaffold(
       appBar: AppBar(
-        automaticallyImplyLeading: widget.showBack,
-        titleSpacing: _searching ? 0.0 : null,
-        leading: _searching
+        automaticallyImplyLeading: !_searchOpen && widget.showBack,
+        titleSpacing: _searchOpen ? 0.0 : null,
+        leading: _searchOpen
             ? IconButton(
                 tooltip: strings.cancel,
                 icon: const Icon(Icons.arrow_back),
                 onPressed: _closeSearch,
               )
-            : (widget.showBack
+            : widget.showBack
                 ? BackButton(onPressed: () => _back(context))
-                : null),
+                : null,
         title: AnimatedSwitcher(
           duration: const Duration(milliseconds: 250),
           switchInCurve: Curves.easeOut,
@@ -122,33 +174,38 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
               child: child,
             ),
           ),
-          child: _searching
-              ? _HeaderSearchField(
-                  key: const ValueKey('search'),
-                  hint: strings.searchHint,
-                  onSubmit: _submitSearch,
+          child: _searchOpen
+              ? TextField(
+                  key: const ValueKey('browse-search-field'),
+                  controller: _searchController,
+                  autofocus: true,
+                  textInputAction: TextInputAction.search,
+                  onChanged: _onSearchChanged,
+                  decoration: InputDecoration(
+                    hintText: strings.searchHint,
+                    border: InputBorder.none,
+                  ),
                 )
               : KeyedSubtree(
-                  key: const ValueKey('title'),
-                  child: widget.showBack
-                      ? Text(isRoot ? strings.library : p.basename(_dir))
-                      : Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Image.asset(
-                              'assets/icon/icon.png',
-                              width: 28,
-                              height: 28,
-                              filterQuality: FilterQuality.medium,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(strings.appName),
-                          ],
-                        ),
+                  key: const ValueKey('browse-title'),
+                  child: titleWidget,
                 ),
         ),
-        actions: _searching
-            ? null
+        actions: _searchOpen
+            ? [
+                if (_searchQuery.isNotEmpty || _searchController.text.isNotEmpty)
+                  IconButton(
+                    tooltip: strings.clear,
+                    icon: const Icon(Icons.clear),
+                    onPressed: () {
+                      _searchDebounce?.cancel();
+
+                      _searchController.clear();
+
+                      setState(() => _searchQuery = '');
+                    },
+                  ),
+              ]
             : [
                 IconButton(
                   tooltip: strings.search,
@@ -177,11 +234,13 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
                 ),
               ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showAddSheet(context),
-        icon: const Icon(Icons.add),
-        label: Text(strings.add),
-      ),
+      floatingActionButton: _searchOpen
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: () => _showAddSheet(context),
+              icon: const Icon(Icons.add),
+              label: Text(strings.add),
+            ),
       body: DropTarget(
         onDragEntered: (_) => setState(() => _dragging = true),
         onDragExited: (_) => setState(() => _dragging = false),
@@ -199,32 +258,40 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
         },
         child: Stack(
           children: [
-            Column(
-              children: [
-                if (root != null) _Breadcrumb(root: root, dir: _dir),
-                _StatsCards(dir: _dir),
-                _FilterBar(),
-                Expanded(
-                  child: listing.when(
-                    loading: () =>
-                        const Center(child: CircularProgressIndicator()),
-                    error: (e, _) => Center(child: Text(strings.genericError)),
-                    data: (entries) {
-                      final visible = filter == null
-                          ? sortEntries(entries, sort)
-                          : entriesForFilter(entries, _dir, filter);
+            _searchOpen
+                ? Column(
+                    children: [
+                      _FilterBar(),
+                      Expanded(child: _SearchResults(query: _searchQuery)),
+                    ],
+                  )
+                : Column(
+                    children: [
+                      if (root != null) _Breadcrumb(root: root, dir: _dir),
+                      _StatsCards(dir: _dir),
+                      _FilterBar(),
+                      Expanded(
+                        child: listing.when(
+                          loading: () =>
+                              const Center(child: CircularProgressIndicator()),
+                          error: (e, _) =>
+                              Center(child: Text(strings.genericError)),
+                          data: (entries) {
+                            final visible = filter == null
+                                ? sortEntries(entries, sort)
+                                : entriesForFilter(entries, _dir, filter);
 
-                      if (visible.isEmpty) {
-                        return _EmptyBrowse(dropping: _dragging);
-                      }
+                            if (visible.isEmpty) {
+                              return _EmptyBrowse(dropping: _dragging);
+                            }
 
-                      return _EntryView(
-                          dir: _dir, entries: visible, viewMode: viewMode);
-                    },
+                            return _EntryView(
+                                dir: _dir, entries: visible, viewMode: viewMode);
+                          },
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
-            ),
             if (_dragging) _DropOverlay(label: strings.dropToImport),
           ],
         ),
@@ -339,84 +406,6 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
       ..showSnackBar(SnackBar(content: Text(message)));
-  }
-}
-
-/// Rounded, pill-shaped search input shown in the header when search is open.
-/// Fixed height, capped width, autofocus, with an inline clear button. The
-/// expand/collapse transition is handled by the AppBar's [AnimatedSwitcher].
-class _HeaderSearchField extends StatefulWidget {
-  const _HeaderSearchField({
-    required this.hint,
-    required this.onSubmit,
-    super.key,
-  });
-
-  final String hint;
-  final ValueChanged<String> onSubmit;
-
-  @override
-  State<_HeaderSearchField> createState() => _HeaderSearchFieldState();
-}
-
-class _HeaderSearchFieldState extends State<_HeaderSearchField> {
-  final _controller = TextEditingController();
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 520),
-        child: Container(
-          height: 42,
-          padding: const EdgeInsets.only(left: 12, right: 4),
-          decoration: BoxDecoration(
-            color: scheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(24),
-          ),
-          child: Row(
-            children: [
-              Icon(Icons.search, size: 20, color: scheme.onSurfaceVariant),
-              const SizedBox(width: 8),
-              Expanded(
-                child: TextField(
-                  controller: _controller,
-                  autofocus: true,
-                  textInputAction: TextInputAction.search,
-                  onSubmitted: widget.onSubmit,
-                  style: Theme.of(context).textTheme.bodyLarge,
-                  decoration: InputDecoration(
-                    isDense: true,
-                    border: InputBorder.none,
-                    hintText: widget.hint,
-                  ),
-                ),
-              ),
-              ValueListenableBuilder<TextEditingValue>(
-                valueListenable: _controller,
-                builder: (context, value, _) => value.text.isEmpty
-                    ? const SizedBox(width: 8)
-                    : IconButton(
-                        tooltip: MaterialLocalizations.of(context)
-                            .deleteButtonTooltip,
-                        icon: const Icon(Icons.clear, size: 18),
-                        visualDensity: VisualDensity.compact,
-                        onPressed: _controller.clear,
-                      ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }
 
@@ -543,6 +532,85 @@ class _FilterBar extends ConsumerWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+/// Global search results (whole workspace, names + tags), shown in place of the
+/// browse listing while the header search field is open. Honours the shared
+/// kind filter from [_FilterBar].
+class _SearchResults extends ConsumerWidget {
+  const _SearchResults({required this.query});
+
+  final String query;
+
+  void _open(BuildContext context, LibraryEntry e) {
+    if (e.isFolder) {
+      context.push(browseRoute(e.path));
+    } else if (e.isNote) {
+      context.push(noteRoute(e.path));
+    } else {
+      context.push(previewRoute(e.path));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final strings = ref.watch(appStringsProvider);
+
+    final root = ref.watch(workspaceRootProvider);
+
+    final filter = ref.watch(browseFilterProvider);
+
+    final index = ref.watch(libraryIndexProvider);
+
+    return index.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(child: Text(strings.genericError)),
+      data: (all) {
+        final results = all
+            .where((e) => filter == null || e.kind == filter)
+            .where((e) => entryMatchesQuery(e, query))
+            .toList();
+
+        if (query.isEmpty && filter == null) {
+          return EmptyState(
+            icon: Icons.search,
+            title: strings.search,
+            message: strings.searchPrompt,
+          );
+        }
+
+        if (results.isEmpty) {
+          return EmptyState(
+            icon: Icons.search_off,
+            title: strings.noResults,
+            message: strings.searchHint,
+          );
+        }
+
+        return ListView.builder(
+          itemCount: results.length,
+          itemBuilder: (context, i) {
+            final e = results[i];
+
+            final folder = root == null
+                ? ''
+                : p.dirname(p.relative(e.path, from: root));
+
+            return ListTile(
+              leading: Icon(_iconFor(e.kind)),
+              title: Text(e.displayName),
+              subtitle: Text(folder == '.'
+                  ? strings.library
+                  : '${strings.inFolder} $folder'),
+              trailing:
+                  e.isFavorite ? const Icon(Icons.star, size: 16) : null,
+              onTap: () => _open(context, e),
+            );
+          },
+        );
+      },
     );
   }
 }
