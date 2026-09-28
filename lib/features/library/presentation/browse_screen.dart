@@ -252,91 +252,92 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
       appBar: _selecting
           ? _buildSelectionBar(strings)
           : AppBar(
-        automaticallyImplyLeading: !_searchOpen && widget.showBack,
-        titleSpacing: _searchOpen ? 0.0 : null,
-        leading: _searchOpen
-            ? IconButton(
-                tooltip: strings.cancel,
-                icon: const Icon(Icons.arrow_back),
-                onPressed: _closeSearch,
-              )
-            : widget.showBack
-                ? BackButton(onPressed: () => _back(context))
-                : null,
-        title: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 250),
-          switchInCurve: Curves.easeOut,
-          switchOutCurve: Curves.easeIn,
-          transitionBuilder: (child, animation) => FadeTransition(
-            opacity: animation,
-            child: SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0.12, 0),
-                end: Offset.zero,
-              ).animate(animation),
-              child: child,
+              automaticallyImplyLeading: !_searchOpen && widget.showBack,
+              titleSpacing: _searchOpen ? 0.0 : null,
+              leading: _searchOpen
+                  ? IconButton(
+                      tooltip: strings.cancel,
+                      icon: const Icon(Icons.arrow_back),
+                      onPressed: _closeSearch,
+                    )
+                  : widget.showBack
+                      ? BackButton(onPressed: () => _back(context))
+                      : null,
+              title: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 250),
+                switchInCurve: Curves.easeOut,
+                switchOutCurve: Curves.easeIn,
+                transitionBuilder: (child, animation) => FadeTransition(
+                  opacity: animation,
+                  child: SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(0.12, 0),
+                      end: Offset.zero,
+                    ).animate(animation),
+                    child: child,
+                  ),
+                ),
+                child: _searchOpen
+                    ? TextField(
+                        key: const ValueKey('browse-search-field'),
+                        controller: _searchController,
+                        autofocus: true,
+                        textInputAction: TextInputAction.search,
+                        onChanged: _onSearchChanged,
+                        decoration: InputDecoration(
+                          hintText: strings.searchHint,
+                          border: InputBorder.none,
+                        ),
+                      )
+                    : KeyedSubtree(
+                        key: const ValueKey('browse-title'),
+                        child: titleWidget,
+                      ),
+              ),
+              actions: _searchOpen
+                  ? [
+                      if (_searchQuery.isNotEmpty ||
+                          _searchController.text.isNotEmpty)
+                        IconButton(
+                          tooltip: strings.clear,
+                          icon: const Icon(Icons.clear),
+                          onPressed: () {
+                            _searchDebounce?.cancel();
+
+                            _searchController.clear();
+
+                            setState(() => _searchQuery = '');
+                          },
+                        ),
+                    ]
+                  : [
+                      IconButton(
+                        tooltip: strings.search,
+                        icon: const Icon(Icons.search),
+                        onPressed: _openSearch,
+                      ),
+                      _SortMenu(),
+                      IconButton(
+                        tooltip: strings.refresh,
+                        icon: const Icon(Icons.refresh),
+                        onPressed: () {
+                          ref.invalidate(directoryProvider(_dir));
+                          ref.invalidate(dirStatsProvider(_dir));
+                        },
+                      ),
+                      IconButton(
+                        tooltip: strings.contents,
+                        icon: Icon(viewMode == ViewMode.grid
+                            ? Icons.view_list_outlined
+                            : Icons.grid_view_outlined),
+                        onPressed: () => ref
+                            .read(settingsControllerProvider.notifier)
+                            .setViewMode(viewMode == ViewMode.grid
+                                ? ViewMode.list
+                                : ViewMode.grid),
+                      ),
+                    ],
             ),
-          ),
-          child: _searchOpen
-              ? TextField(
-                  key: const ValueKey('browse-search-field'),
-                  controller: _searchController,
-                  autofocus: true,
-                  textInputAction: TextInputAction.search,
-                  onChanged: _onSearchChanged,
-                  decoration: InputDecoration(
-                    hintText: strings.searchHint,
-                    border: InputBorder.none,
-                  ),
-                )
-              : KeyedSubtree(
-                  key: const ValueKey('browse-title'),
-                  child: titleWidget,
-                ),
-        ),
-        actions: _searchOpen
-            ? [
-                if (_searchQuery.isNotEmpty || _searchController.text.isNotEmpty)
-                  IconButton(
-                    tooltip: strings.clear,
-                    icon: const Icon(Icons.clear),
-                    onPressed: () {
-                      _searchDebounce?.cancel();
-
-                      _searchController.clear();
-
-                      setState(() => _searchQuery = '');
-                    },
-                  ),
-              ]
-            : [
-                IconButton(
-                  tooltip: strings.search,
-                  icon: const Icon(Icons.search),
-                  onPressed: _openSearch,
-                ),
-                _SortMenu(),
-                IconButton(
-                  tooltip: strings.refresh,
-                  icon: const Icon(Icons.refresh),
-                  onPressed: () {
-                    ref.invalidate(directoryProvider(_dir));
-                    ref.invalidate(dirStatsProvider(_dir));
-                  },
-                ),
-                IconButton(
-                  tooltip: strings.contents,
-                  icon: Icon(viewMode == ViewMode.grid
-                      ? Icons.view_list_outlined
-                      : Icons.grid_view_outlined),
-                  onPressed: () => ref
-                      .read(settingsControllerProvider.notifier)
-                      .setViewMode(viewMode == ViewMode.grid
-                          ? ViewMode.list
-                          : ViewMode.grid),
-                ),
-              ],
-      ),
       floatingActionButton: _searchOpen || _selecting
           ? null
           : FloatingActionButton.extended(
@@ -705,9 +706,8 @@ class _SearchResults extends ConsumerWidget {
           itemBuilder: (context, i) {
             final e = results[i];
 
-            final folder = root == null
-                ? ''
-                : p.dirname(p.relative(e.path, from: root));
+            final folder =
+                root == null ? '' : p.dirname(p.relative(e.path, from: root));
 
             return ListTile(
               leading: Icon(_iconFor(e.kind)),
@@ -715,8 +715,7 @@ class _SearchResults extends ConsumerWidget {
               subtitle: Text(folder == '.'
                   ? strings.library
                   : '${strings.inFolder} $folder'),
-              trailing:
-                  e.isFavorite ? const Icon(Icons.star, size: 16) : null,
+              trailing: e.isFavorite ? const Icon(Icons.star, size: 16) : null,
               onTap: () => _open(context, e),
             );
           },
