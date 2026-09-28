@@ -447,23 +447,21 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
                 context.push(newNoteRoute(_dir));
               },
             ),
-            ListTile(
-              leading: const Icon(Icons.drive_file_move_outlined),
-              title: Text(strings.moveFilesIn),
-              onTap: () {
-                Navigator.pop(sheetContext);
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+              child: _ImportMoveRow(
+                strings: strings,
+                onImport: () {
+                  Navigator.pop(sheetContext);
 
-                _pickAndMove();
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.upload_file_outlined),
-              title: Text(strings.importFiles),
-              onTap: () {
-                Navigator.pop(sheetContext);
+                  _pickAndImport();
+                },
+                onMove: () {
+                  Navigator.pop(sheetContext);
 
-                _pickAndImport();
-              },
+                  _pickAndMove();
+                },
+              ),
             ),
           ],
         ),
@@ -547,6 +545,80 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
       ..showSnackBar(SnackBar(content: Text(message)));
+  }
+}
+
+/// The "Importer" / "Déplacer" pair in the add sheet, shown side by side.
+/// When both labels don't fit the available width, "Déplacer" collapses to
+/// an icon-only button so the row never wraps onto a second line.
+class _ImportMoveRow extends StatelessWidget {
+  const _ImportMoveRow({
+    required this.strings,
+    required this.onImport,
+    required this.onMove,
+  });
+
+  final AppStrings strings;
+  final VoidCallback onImport;
+  final VoidCallback onMove;
+
+  // Estimated chrome (icon + gap + horizontal padding) around a button's
+  // label, used to judge whether both buttons fit on one line.
+  static const _buttonChrome = 76.0;
+  static const _gap = 12.0;
+
+  double _labelWidth(BuildContext context, String label) {
+    final painter = TextPainter(
+      text: TextSpan(
+        text: label,
+        style: Theme.of(context).textTheme.labelLarge,
+      ),
+      textDirection: Directionality.of(context),
+    )..layout();
+    return painter.width;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final importLabel = strings.importAction;
+    final moveLabel = strings.move;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final needed = _labelWidth(context, importLabel) +
+            _labelWidth(context, moveLabel) +
+            _buttonChrome * 2 +
+            _gap;
+        final fitsBoth = needed <= constraints.maxWidth;
+
+        return Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: onImport,
+                icon: const Icon(Icons.upload_file_outlined),
+                label: Text(importLabel),
+              ),
+            ),
+            const SizedBox(width: _gap),
+            if (fitsBoth)
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: onMove,
+                  icon: const Icon(Icons.drive_file_move_outlined),
+                  label: Text(moveLabel),
+                ),
+              )
+            else
+              IconButton.outlined(
+                onPressed: onMove,
+                tooltip: strings.moveFilesIn,
+                icon: const Icon(Icons.drive_file_move_outlined),
+              ),
+          ],
+        );
+      },
+    );
   }
 }
 
