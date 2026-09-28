@@ -956,7 +956,13 @@ class _EntryView extends ConsumerWidget {
                   : _EntryThumb(entry: e, size: 40),
               title: Text(e.displayName),
               subtitle: e.isFolder ? _tagsLine(e) : _fileSubtitle(e),
-              trailing: selecting ? null : _EntryMenu(dir: dir, entry: e),
+              trailing: selecting
+                  ? null
+                  : _EntryMenu(
+                      dir: dir,
+                      entry: e,
+                      onSelect: () => onStartSelection(e.path),
+                    ),
               onTap: () => _tap(context, e),
               onLongPress: () => _longPress(e),
             ),
@@ -1037,7 +1043,12 @@ class _EntryView extends ConsumerWidget {
                         ),
                       ),
                       if (!selecting)
-                        _EntryMenu(dir: dir, entry: e, dense: true),
+                        _EntryMenu(
+                          dir: dir,
+                          entry: e,
+                          dense: true,
+                          onSelect: () => onStartSelection(e.path),
+                        ),
                     ],
                   ),
                 ),
@@ -1111,12 +1122,19 @@ class _EntryThumb extends StatelessWidget {
 }
 
 class _EntryMenu extends ConsumerWidget {
-  const _EntryMenu(
-      {required this.dir, required this.entry, this.dense = false});
+  const _EntryMenu({
+    required this.dir,
+    required this.entry,
+    required this.onSelect,
+    this.dense = false,
+  });
 
   final String dir;
 
   final LibraryEntry entry;
+
+  /// Enters selection mode with this entry selected.
+  final VoidCallback onSelect;
 
   final bool dense;
 
@@ -1130,6 +1148,9 @@ class _EntryMenu extends ConsumerWidget {
       icon: dense ? const Icon(Icons.more_vert, size: 18) : null,
       onSelected: (value) async {
         switch (value) {
+          case 'select':
+            onSelect();
+
           case 'favorite':
             await controller.setFavorite(entry.path, !entry.isFavorite,
                 parentDir: dir);
@@ -1178,6 +1199,8 @@ class _EntryMenu extends ConsumerWidget {
         }
       },
       itemBuilder: (context) => [
+        PopupMenuItem(value: 'select', child: Text(strings.selectAction)),
+        const PopupMenuDivider(),
         PopupMenuItem(
           value: 'favorite',
           child: Text(entry.isFavorite

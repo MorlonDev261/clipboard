@@ -260,8 +260,12 @@ class _FileBrowserScreenState extends ConsumerState<_FileBrowserScreen> {
       Navigator.of(context).pop(<String>[file.path]);
       return;
     }
+    _toggleSelected(file.path);
+  }
+
+  void _toggleSelected(String path) {
     setState(() {
-      if (!_selected.add(file.path)) _selected.remove(file.path);
+      if (!_selected.add(path)) _selected.remove(path);
     });
   }
 
@@ -297,13 +301,16 @@ class _FileBrowserScreenState extends ConsumerState<_FileBrowserScreen> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(title),
+        // Creating a folder only makes sense when choosing a destination —
+        // an import/attach browser only ever reads from the source side.
         actions: [
-          IconButton(
-            icon: const Icon(Icons.create_new_folder_outlined),
-            tooltip: strings.newFolder,
-            onPressed:
-                (_current == null || _error != null) ? null : _createFolder,
-          ),
+          if (widget.mode == PickMode.directory)
+            IconButton(
+              icon: const Icon(Icons.create_new_folder_outlined),
+              tooltip: strings.newFolder,
+              onPressed:
+                  (_current == null || _error != null) ? null : _createFolder,
+            ),
         ],
       ),
       body: Column(
@@ -360,11 +367,21 @@ class _FileBrowserScreenState extends ConsumerState<_FileBrowserScreen> {
         final ent = _entries[i];
         final name = p.basename(ent.path);
         if (ent is Directory) {
+          // Whole folders can be picked as an import source too — the
+          // checkbox selects the folder itself, the row still navigates in.
+          final canSelectFolder = widget.mode == PickMode.files && _multi;
+          final folderSelected = _selected.contains(ent.path);
           return ListTile(
+            selected: canSelectFolder && folderSelected,
             leading: Icon(Icons.folder,
                 color: Theme.of(context).colorScheme.primary),
             title: Text(name),
-            trailing: const Icon(Icons.chevron_right),
+            trailing: canSelectFolder
+                ? Checkbox(
+                    value: folderSelected,
+                    onChanged: (_) => _toggleSelected(ent.path),
+                  )
+                : const Icon(Icons.chevron_right),
             onTap: () => _load(ent),
           );
         }
