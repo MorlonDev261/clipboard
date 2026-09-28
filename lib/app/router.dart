@@ -9,6 +9,7 @@ import '../features/library/presentation/note_screen.dart';
 import '../features/library/presentation/preview_screen.dart';
 import '../features/search/presentation/search_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
+import '../features/splash/presentation/splash_screen.dart';
 import '../features/trash/presentation/trash_screen.dart';
 import 'widgets/app_shell.dart';
 
@@ -16,8 +17,13 @@ import 'widgets/app_shell.dart';
 /// parameter (they contain slashes, so they can't be path segments).
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
-    initialLocation: '/',
+    initialLocation: '/splash',
     routes: [
+      // Splash lives outside the shell so it has no navigation bar.
+      GoRoute(
+        path: '/splash',
+        builder: (context, state) => const SplashScreen(),
+      ),
       ShellRoute(
         builder: (context, state, child) =>
             AppShell(location: state.uri.path, child: child),

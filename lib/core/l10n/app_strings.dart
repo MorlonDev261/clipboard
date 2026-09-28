@@ -13,7 +13,7 @@ class AppStrings {
   bool get _isEn => locale.languageCode == 'en';
   String _t(String fr, String en) => _isEn ? en : fr;
 
-  String get appName => 'Influencor';
+  String get appName => 'influencor';
 
   // Navigation
   String get home => _t('Accueil', 'Home');
