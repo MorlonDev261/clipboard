@@ -193,6 +193,53 @@ class _FileBrowserScreenState extends ConsumerState<_FileBrowserScreen> {
     _load(parent);
   }
 
+  /// Prompts for a name and creates a sub-folder in the current directory,
+  /// then reloads so it shows up (and can be entered or picked).
+  Future<void> _createFolder() async {
+    final cur = _current;
+    if (cur == null) return;
+    final strings = ref.read(appStringsProvider);
+    final controller = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(strings.newFolderTitle),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: InputDecoration(labelText: strings.folderNameLabel),
+          onSubmitted: (v) => Navigator.pop(context, v),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(strings.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text),
+            child: Text(strings.create),
+          ),
+        ],
+      ),
+    );
+    final trimmed = name?.trim() ?? '';
+    if (trimmed.isEmpty) return;
+    try {
+      final dir = Directory(p.join(cur.path, trimmed));
+      if (!dir.existsSync()) await dir.create();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(SnackBar(content: Text(strings.folderCreated(trimmed))));
+      await _load(cur); // refresh listing to reveal the new folder
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(SnackBar(content: Text(strings.folderAccessError)));
+    }
+  }
+
   // --- Selection / confirmation ---------------------------------------------
 
   void _onFileTap(File file) {
@@ -235,6 +282,14 @@ class _FileBrowserScreenState extends ConsumerState<_FileBrowserScreen> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(title),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.create_new_folder_outlined),
+            tooltip: strings.newFolder,
+            onPressed:
+                (_current == null || _error != null) ? null : _createFolder,
+          ),
+        ],
       ),
       body: Column(
         children: [

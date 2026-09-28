@@ -1,6 +1,6 @@
 /// App-wide constants and configurable defaults.
 abstract final class AppConstants {
-  static const String appName = 'Influencor.mg';
+  static const String appName = 'Influencor';
 
   /// Layout breakpoint (logical pixels) above which the desktop / tablet
   /// layout (persistent sidebar, wider grids) is used.

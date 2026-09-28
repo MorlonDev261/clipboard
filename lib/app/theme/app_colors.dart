@@ -5,8 +5,9 @@ import 'package:flutter/material.dart';
 /// Colors are exposed as raw tokens here; [AppTheme] wires them into the
 /// Material 3 [ColorScheme].
 abstract final class AppColors {
-  static const Color primary = Color(0xFF635BFF);
-  static const Color secondary = Color(0xFF8B5CF6);
+  // Brand blue, sampled from the app logo (the hexagon).
+  static const Color primary = Color(0xFF204DA0);
+  static const Color secondary = Color(0xFF3B6FD6);
 
   static const Color backgroundLight = Color(0xFFF8FAFC);
   static const Color backgroundDark = Color(0xFF0F172A);

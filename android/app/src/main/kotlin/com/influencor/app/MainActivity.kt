@@ -1,4 +1,4 @@
-package com.clipboard.clipboard
+package com.influencor.app
 
 import io.flutter.embedding.android.FlutterActivity
 
