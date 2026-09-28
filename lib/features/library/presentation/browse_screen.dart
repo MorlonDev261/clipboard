@@ -55,8 +55,17 @@ class BrowseScreen extends ConsumerStatefulWidget {
 
 class _BrowseScreenState extends ConsumerState<BrowseScreen> {
   bool _dragging = false;
+  bool _searching = false;
 
   String get _dir => widget.dirPath;
+
+  void _openSearch() => setState(() => _searching = true);
+  void _closeSearch() => setState(() => _searching = false);
+
+  void _submitSearch(String query) {
+    setState(() => _searching = false);
+    context.push(searchRoute(query));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -89,51 +98,84 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: widget.showBack,
-        leading: widget.showBack
-            ? BackButton(onPressed: () => _back(context))
-            : null,
-        title: widget.showBack
-            ? Text(isRoot ? strings.library : p.basename(_dir))
-            : Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Image.asset(
-                    'assets/icon/icon.png',
-                    width: 28,
-                    height: 28,
-                    filterQuality: FilterQuality.medium,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(strings.appName),
-                ],
-              ),
-        actions: [
-          IconButton(
-            tooltip: strings.search,
-            icon: const Icon(Icons.search),
-            onPressed: () => context.push('/search'),
+        titleSpacing: _searching ? 0.0 : null,
+        leading: _searching
+            ? IconButton(
+                tooltip: strings.cancel,
+                icon: const Icon(Icons.arrow_back),
+                onPressed: _closeSearch,
+              )
+            : (widget.showBack
+                ? BackButton(onPressed: () => _back(context))
+                : null),
+        title: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 250),
+          switchInCurve: Curves.easeOut,
+          switchOutCurve: Curves.easeIn,
+          transitionBuilder: (child, animation) => FadeTransition(
+            opacity: animation,
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0.12, 0),
+                end: Offset.zero,
+              ).animate(animation),
+              child: child,
+            ),
           ),
-          _SortMenu(),
-          IconButton(
-            tooltip: strings.refresh,
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              ref.invalidate(directoryProvider(_dir));
-
-              ref.invalidate(dirStatsProvider(_dir));
-            },
-          ),
-          IconButton(
-            tooltip: strings.contents,
-            icon: Icon(viewMode == ViewMode.grid
-                ? Icons.view_list_outlined
-                : Icons.grid_view_outlined),
-            onPressed: () => ref
-                .read(settingsControllerProvider.notifier)
-                .setViewMode(
-                    viewMode == ViewMode.grid ? ViewMode.list : ViewMode.grid),
-          ),
-        ],
+          child: _searching
+              ? _HeaderSearchField(
+                  key: const ValueKey('search'),
+                  hint: strings.searchHint,
+                  onSubmit: _submitSearch,
+                )
+              : KeyedSubtree(
+                  key: const ValueKey('title'),
+                  child: widget.showBack
+                      ? Text(isRoot ? strings.library : p.basename(_dir))
+                      : Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Image.asset(
+                              'assets/icon/icon.png',
+                              width: 28,
+                              height: 28,
+                              filterQuality: FilterQuality.medium,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(strings.appName),
+                          ],
+                        ),
+                ),
+        ),
+        actions: _searching
+            ? null
+            : [
+                IconButton(
+                  tooltip: strings.search,
+                  icon: const Icon(Icons.search),
+                  onPressed: _openSearch,
+                ),
+                _SortMenu(),
+                IconButton(
+                  tooltip: strings.refresh,
+                  icon: const Icon(Icons.refresh),
+                  onPressed: () {
+                    ref.invalidate(directoryProvider(_dir));
+                    ref.invalidate(dirStatsProvider(_dir));
+                  },
+                ),
+                IconButton(
+                  tooltip: strings.contents,
+                  icon: Icon(viewMode == ViewMode.grid
+                      ? Icons.view_list_outlined
+                      : Icons.grid_view_outlined),
+                  onPressed: () => ref
+                      .read(settingsControllerProvider.notifier)
+                      .setViewMode(viewMode == ViewMode.grid
+                          ? ViewMode.list
+                          : ViewMode.grid),
+                ),
+              ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showAddSheet(context),
@@ -297,6 +339,84 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
       ..showSnackBar(SnackBar(content: Text(message)));
+  }
+}
+
+/// Rounded, pill-shaped search input shown in the header when search is open.
+/// Fixed height, capped width, autofocus, with an inline clear button. The
+/// expand/collapse transition is handled by the AppBar's [AnimatedSwitcher].
+class _HeaderSearchField extends StatefulWidget {
+  const _HeaderSearchField({
+    required this.hint,
+    required this.onSubmit,
+    super.key,
+  });
+
+  final String hint;
+  final ValueChanged<String> onSubmit;
+
+  @override
+  State<_HeaderSearchField> createState() => _HeaderSearchFieldState();
+}
+
+class _HeaderSearchFieldState extends State<_HeaderSearchField> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 520),
+        child: Container(
+          height: 42,
+          padding: const EdgeInsets.only(left: 12, right: 4),
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.search, size: 20, color: scheme.onSurfaceVariant),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextField(
+                  controller: _controller,
+                  autofocus: true,
+                  textInputAction: TextInputAction.search,
+                  onSubmitted: widget.onSubmit,
+                  style: Theme.of(context).textTheme.bodyLarge,
+                  decoration: InputDecoration(
+                    isDense: true,
+                    border: InputBorder.none,
+                    hintText: widget.hint,
+                  ),
+                ),
+              ),
+              ValueListenableBuilder<TextEditingValue>(
+                valueListenable: _controller,
+                builder: (context, value, _) => value.text.isEmpty
+                    ? const SizedBox(width: 8)
+                    : IconButton(
+                        tooltip: MaterialLocalizations.of(context)
+                            .deleteButtonTooltip,
+                        icon: const Icon(Icons.clear, size: 18),
+                        visualDensity: VisualDensity.compact,
+                        onPressed: _controller.clear,
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 

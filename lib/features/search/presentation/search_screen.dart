@@ -16,7 +16,10 @@ import '../../library/domain/library_entry.dart';
 /// Global search over the whole workspace (names + tags), with a kind filter
 /// and a 300 ms debounce.
 class SearchScreen extends ConsumerStatefulWidget {
-  const SearchScreen({super.key});
+  const SearchScreen({this.initialQuery, super.key});
+
+  /// Optional query to pre-fill the field with (e.g. from the header search).
+  final String? initialQuery;
 
   @override
   ConsumerState<SearchScreen> createState() => _SearchScreenState();
@@ -27,6 +30,16 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   Timer? _debounce;
   String _query = '';
   EntryKind? _filter;
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.initialQuery?.trim() ?? '';
+    if (initial.isNotEmpty) {
+      _controller.text = initial;
+      _query = initial;
+    }
+  }
 
   @override
   void dispose() {
