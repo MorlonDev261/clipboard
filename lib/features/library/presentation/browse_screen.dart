@@ -843,13 +843,22 @@ class _EntryView extends ConsumerWidget {
         itemBuilder: (context, i) {
           final e = entries[i];
 
+          final isSelected = selected.contains(e.path);
+
           return Card(
             child: ListTile(
-              leading: _EntryThumb(entry: e, size: 40),
+              selected: isSelected,
+              leading: selecting
+                  ? Checkbox(
+                      value: isSelected,
+                      onChanged: (_) => onToggle(e.path),
+                    )
+                  : _EntryThumb(entry: e, size: 40),
               title: Text(e.displayName),
               subtitle: e.isFolder ? _tagsLine(e) : _fileSubtitle(e),
-              trailing: _EntryMenu(dir: dir, entry: e),
-              onTap: () => _open(context, e),
+              trailing: selecting ? null : _EntryMenu(dir: dir, entry: e),
+              onTap: () => _tap(context, e),
+              onLongPress: () => _longPress(e),
             ),
           );
         },
@@ -873,14 +882,42 @@ class _EntryView extends ConsumerWidget {
       itemBuilder: (context, i) {
         final e = entries[i];
 
+        final isSelected = selected.contains(e.path);
+
         return Card(
           clipBehavior: Clip.antiAlias,
+          shape: isSelected
+              ? RoundedRectangleBorder(
+                  side: BorderSide(
+                    color: Theme.of(context).colorScheme.primary,
+                    width: 2,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                )
+              : null,
           child: InkWell(
-            onTap: () => _open(context, e),
+            onTap: () => _tap(context, e),
+            onLongPress: () => _longPress(e),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(child: _EntryThumb(entry: e, fill: true)),
+                Expanded(
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      _EntryThumb(entry: e, fill: true),
+                      if (selecting)
+                        Positioned(
+                          top: 4,
+                          left: 4,
+                          child: Checkbox(
+                            value: isSelected,
+                            onChanged: (_) => onToggle(e.path),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
                 Padding(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -899,7 +936,8 @@ class _EntryView extends ConsumerWidget {
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                       ),
-                      _EntryMenu(dir: dir, entry: e, dense: true),
+                      if (!selecting)
+                        _EntryMenu(dir: dir, entry: e, dense: true),
                     ],
                   ),
                 ),
