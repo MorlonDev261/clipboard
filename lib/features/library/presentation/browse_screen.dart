@@ -16,6 +16,8 @@ import '../../../app/constants/app_constants.dart';
 
 import '../../../app/nav.dart';
 
+import '../../../app/widgets/app_header_title.dart';
+
 import '../../../core/l10n/app_strings.dart';
 
 import '../../../core/picker/app_file_picker.dart';
@@ -133,19 +135,7 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
 
     final titleWidget = widget.showBack
         ? Text(isRoot ? strings.library : p.basename(_dir))
-        : Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Image.asset(
-                'assets/icon/icon.png',
-                width: 28,
-                height: 28,
-                filterQuality: FilterQuality.medium,
-              ),
-              const SizedBox(width: 8),
-              Text(strings.appName),
-            ],
-          );
+        : const AppHeaderTitle();
 
     return Scaffold(
       appBar: AppBar(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../app/widgets/app_header_title.dart';
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/picker/app_file_picker.dart';
 import '../../../core/picker/pick_mode.dart';
@@ -34,13 +35,13 @@ class HomeScreen extends ConsumerWidget {
         body: Center(child: CircularProgressIndicator()),
       ),
       error: (e, _) => Scaffold(
-        appBar: AppBar(title: Text(strings.appName)),
+        appBar: AppBar(title: const AppHeaderTitle()),
         body: Center(child: Text(strings.genericError)),
       ),
       data: (root) {
         if (root == null) {
           return Scaffold(
-            appBar: AppBar(title: Text(strings.appName)),
+            appBar: AppBar(title: const AppHeaderTitle()),
             body: _ChooseWorkspace(onPick: () => _pickWorkspace(context, ref)),
           );
         }
