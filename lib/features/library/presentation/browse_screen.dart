@@ -108,6 +108,11 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
                 ],
               ),
         actions: [
+          IconButton(
+            tooltip: strings.search,
+            icon: const Icon(Icons.search),
+            onPressed: () => context.push('/search'),
+          ),
           _SortMenu(),
           IconButton(
             tooltip: strings.refresh,

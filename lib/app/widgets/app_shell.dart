@@ -7,8 +7,11 @@ import '../constants/app_constants.dart';
 
 /// Top-level responsive navigation shell.
 ///
-/// * Mobile (< [AppConstants.desktopBreakpoint]): bottom [NavigationBar].
+/// * Mobile (< [AppConstants.desktopBreakpoint]): a custom bottom bar with the
+///   assistant as a larger, centered button.
 /// * Desktop / tablet: persistent [NavigationRail] sidebar.
+///
+/// Search is not a tab: it is reached from the header (see BrowseScreen).
 class AppShell extends ConsumerWidget {
   const AppShell({
     required this.location,
@@ -19,18 +22,21 @@ class AppShell extends ConsumerWidget {
   final String location;
   final Widget child;
 
+  /// Index of the assistant destination — rendered larger and centered.
+  static const _centerIndex = 2;
+
   static const _destinations = <_Destination>[
     _Destination('/', Icons.home_outlined, Icons.home),
-    _Destination('/search', Icons.search_outlined, Icons.search),
     _Destination('/favorites', Icons.star_border, Icons.star),
+    _Destination('/assistant', Icons.assistant_outlined, Icons.assistant),
     _Destination('/trash', Icons.delete_outline, Icons.delete),
     _Destination('/settings', Icons.settings_outlined, Icons.settings),
   ];
 
   int get _selectedIndex {
-    // Browse / note / preview routes belong to the "home" tab.
-    if (location.startsWith('/search')) return 1;
-    if (location.startsWith('/favorites')) return 2;
+    // Browse / note / preview / search routes belong to the "home" tab.
+    if (location.startsWith('/favorites')) return 1;
+    if (location.startsWith('/assistant')) return 2;
     if (location.startsWith('/trash')) return 3;
     if (location.startsWith('/settings')) return 4;
     return 0;
@@ -45,8 +51,8 @@ class AppShell extends ConsumerWidget {
     final strings = ref.watch(appStringsProvider);
     final labels = [
       strings.home,
-      strings.search,
       strings.favorites,
+      strings.assistant,
       strings.trash,
       strings.settings,
     ];
@@ -87,17 +93,147 @@ class AppShell extends ConsumerWidget {
 
     return Scaffold(
       body: child,
-      bottomNavigationBar: NavigationBar(
+      bottomNavigationBar: _BottomBar(
         selectedIndex: _selectedIndex,
-        onDestinationSelected: (i) => _onSelect(context, i),
-        destinations: [
-          for (var i = 0; i < _destinations.length; i++)
-            NavigationDestination(
-              icon: Icon(_destinations[i].icon),
-              selectedIcon: Icon(_destinations[i].selectedIcon),
-              label: labels[i],
+        labels: labels,
+        destinations: _destinations,
+        centerIndex: _centerIndex,
+        onSelect: (i) => _onSelect(context, i),
+      ),
+    );
+  }
+}
+
+/// Custom mobile bottom bar: four flat tabs with a larger, raised circular
+/// button in the middle for the assistant.
+class _BottomBar extends StatelessWidget {
+  const _BottomBar({
+    required this.selectedIndex,
+    required this.labels,
+    required this.destinations,
+    required this.centerIndex,
+    required this.onSelect,
+  });
+
+  final int selectedIndex;
+  final List<String> labels;
+  final List<_Destination> destinations;
+  final int centerIndex;
+  final ValueChanged<int> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Material(
+      elevation: 3,
+      color: scheme.surface,
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 68,
+          child: Row(
+            children: [
+              for (var i = 0; i < destinations.length; i++)
+                if (i == centerIndex)
+                  _CenterButton(
+                    icon: destinations[i].selectedIcon,
+                    selected: selectedIndex == i,
+                    onTap: () => onSelect(i),
+                  )
+                else
+                  _Tab(
+                    label: labels[i],
+                    icon: selectedIndex == i
+                        ? destinations[i].selectedIcon
+                        : destinations[i].icon,
+                    selected: selectedIndex == i,
+                    onTap: () => onSelect(i),
+                  ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _Tab extends StatelessWidget {
+  const _Tab({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final color = selected ? scheme.primary : scheme.onSurfaceVariant;
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, color: color, size: 24),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 11, color: color),
             ),
-        ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CenterButton extends StatelessWidget {
+  const _CenterButton({
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Expanded(
+      child: Center(
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: scheme.primary,
+              shape: BoxShape.circle,
+              border: selected
+                  ? Border.all(color: scheme.onPrimary, width: 2)
+                  : null,
+              boxShadow: [
+                BoxShadow(
+                  color: scheme.shadow.withValues(alpha: 0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Icon(icon, color: scheme.onPrimary, size: 28),
+          ),
+        ),
       ),
     );
   }

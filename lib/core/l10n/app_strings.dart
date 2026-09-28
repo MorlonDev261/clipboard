@@ -22,6 +22,20 @@ class AppStrings {
   String get settings => _t('Réglages', 'Settings');
   String get favorites => _t('Favoris', 'Favorites');
   String get library => _t('Bibliothèque', 'Library');
+  String get assistant => _t('Assistant', 'Assistant');
+
+  // Assistant (chat)
+  String get assistantIntro => _t(
+        'Posez une question ou décrivez ce que vous cherchez.',
+        'Ask a question or describe what you are looking for.',
+      );
+  String get assistantHint => _t('Écrivez un message…', 'Write a message…');
+  String get assistantComingSoon => _t(
+        "L'assistant arrive bientôt : cette conversation n'est pas encore "
+            'connectée à un service.',
+        'The assistant is coming soon: this conversation is not connected to a '
+            'service yet.',
+      );
 
   // Generic actions
   String get add => _t('Ajouter', 'Add');
