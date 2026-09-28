@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <!-- Background of the Android 12+ system splash window (light). Matches the
-         app's light background (AppColors.backgroundLight) so the hand-off from
-         the system splash to the Flutter splash shows no color change. -->
-    <color name="splashBackground">#FFF8FAFC</color>
-</resources>

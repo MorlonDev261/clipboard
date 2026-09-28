@@ -1,0 +1,33 @@
+# Native splash configuration for influencor.
+#
+# Values are taken from the app's existing identity:
+#   - color        -> AppColors.backgroundLight (#F8FAFC), the light background
+#                     the app and the previous splash already used. A light
+#                     background keeps the blue logo visible (there is no white
+#                     logo variant to put on a blue background).
+#   - color_dark   -> AppColors.backgroundDark (#0F172A).
+#   - image        -> the existing app logo (assets/icon/icon.png).
+#   - branding     -> the app name "influencor", rendered from the app's own
+#                     blue (#204DA0) since no separate branding image existed.
+#
+# On Android 12+ the branding is shown at the bottom (system constraint: the
+# logo goes in the centre icon slot, the name in the branding slot).
+flutter_native_splash:
+  color: "#F8FAFC"
+  image: assets/icon/icon.png
+  branding: assets/splash/branding.png
+  color_dark: "#0F172A"
+  branding_dark: assets/splash/branding_dark.png
+
+  android_12:
+    color: "#F8FAFC"
+    image: assets/icon/icon.png
+    icon_background_color: "#F8FAFC"
+    branding: assets/splash/branding.png
+    color_dark: "#0F172A"
+    icon_background_color_dark: "#0F172A"
+    branding_dark: assets/splash/branding_dark.png
+
+  android: true
+  ios: true
+  web: false
