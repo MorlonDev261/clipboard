@@ -7,6 +7,8 @@ import 'package:flutter/material.dart';
 abstract final class AppColors {
   // Brand blue, sampled from the app logo (the hexagon).
   static const Color primary = Color(0xFF204DA0);
+  // A lighter tint of the brand blue for enough contrast on dark surfaces.
+  static const Color primaryBright = Color(0xFF4C86E5);
   static const Color secondary = Color(0xFF3B6FD6);
 
   static const Color backgroundLight = Color(0xFFF8FAFC);

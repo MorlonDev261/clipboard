@@ -15,7 +15,13 @@ abstract final class AppTheme {
       seedColor: AppColors.primary,
       brightness: brightness,
     ).copyWith(
+      // Force the vivid logo blue on the brand roles instead of the muted
+      // tone that fromSeed derives, so buttons, nav and the FAB read as the
+      // logo's blue.
+      primary: isDark ? AppColors.primaryBright : AppColors.primary,
+      onPrimary: Colors.white,
       secondary: AppColors.secondary,
+      onSecondary: Colors.white,
       surface: isDark ? AppColors.cardDark : AppColors.cardLight,
       error: AppColors.error,
     );
