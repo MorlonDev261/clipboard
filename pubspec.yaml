@@ -69,15 +69,20 @@ flutter:
 
 # App launcher icons (run: dart run flutter_launcher_icons)
 flutter_launcher_icons:
-  image_path: "assets/icon/icon.png"
+  # Full-blue launcher icon: solid brand blue fills the whole icon, white
+  # figure on top. Android uses an adaptive icon (blue background + figure-only
+  # foreground); other platforms use the pre-composited blue icon.
+  image_path: "assets/icon/icon_blue.png"
   android: true
+  adaptive_icon_background: "#204DA0"
+  adaptive_icon_foreground: "assets/icon/icon_fg.png"
   ios: true
   remove_alpha_ios: true
-  background_color_ios: "#ffffff"
+  background_color_ios: "#204DA0"
   web:
     generate: true
-    background_color: "#ffffff"
-    theme_color: "#1E50A0"
+    background_color: "#204DA0"
+    theme_color: "#204DA0"
   windows:
     generate: true
     icon_size: 256
