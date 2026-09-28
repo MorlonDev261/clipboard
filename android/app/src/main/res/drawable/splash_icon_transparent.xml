@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A transparent drawable used to hide the Android 12+ system splash icon, so
+     the app shows a single (Flutter) splash with the logo and name instead of
+     the system icon followed by the Flutter splash. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@android:color/transparent" />
+</shape>

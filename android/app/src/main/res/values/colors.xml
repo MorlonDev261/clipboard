@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Background of the Android 12+ system splash window (light). Matches the
+         Flutter splash Scaffold background so the transition is seamless. -->
+    <color name="splashBackground">#FFFFFFFF</color>
+</resources>

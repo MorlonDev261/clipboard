@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Background of the Android 12+ system splash window (dark). Matches the
+         app's dark background (AppColors.backgroundDark). -->
+    <color name="splashBackground">#FF0F172A</color>
+</resources>
