@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 
 import '../../features/library/domain/library_entry.dart';
+import '../widgets/empty_state.dart';
 import '../l10n/app_strings.dart';
 import 'pick_mode.dart';
 
@@ -19,6 +20,20 @@ Future<List<String>> launchInAppBrowser(
   String? initialDirectory,
   String? actionLabel,
 }) async {
+  if (mode == PickMode.mediaFiles) {
+    final result = await Navigator.of(context).push<List<String>>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => _MediaGalleryScreen(
+          allowMultiple: allowMultiple,
+          title: title,
+          initialDirectory: initialDirectory,
+          actionLabel: actionLabel,
+        ),
+      ),
+    );
+    return result ?? const [];
+  }
   final result = await Navigator.of(context).push<List<String>>(
     MaterialPageRoute(
       fullscreenDialog: true,
@@ -34,6 +49,25 @@ Future<List<String>> launchInAppBrowser(
   return result ?? const [];
 }
 
+Future<({List<String> paths, bool move})> launchInAppBrowserForImport(
+  BuildContext context, {
+  String? title,
+}) async {
+  final result =
+      await Navigator.of(context).push<({List<String> paths, bool move})>(
+    MaterialPageRoute(
+      fullscreenDialog: true,
+      builder: (_) => _FileBrowserScreen(
+        mode: PickMode.files,
+        allowMultiple: true,
+        title: title,
+        showImportMoveActions: true,
+      ),
+    ),
+  );
+  return result ?? (paths: const <String>[], move: false);
+}
+
 class _FileBrowserScreen extends ConsumerStatefulWidget {
   const _FileBrowserScreen({
     required this.mode,
@@ -41,6 +75,7 @@ class _FileBrowserScreen extends ConsumerStatefulWidget {
     this.title,
     this.initialDirectory,
     this.actionLabel,
+    this.showImportMoveActions = false,
   });
 
   final PickMode mode;
@@ -48,6 +83,7 @@ class _FileBrowserScreen extends ConsumerStatefulWidget {
   final String? title;
   final String? initialDirectory;
   final String? actionLabel;
+  final bool showImportMoveActions;
 
   @override
   ConsumerState<_FileBrowserScreen> createState() => _FileBrowserScreenState();
@@ -60,10 +96,550 @@ class _Shortcut {
   final String path;
 }
 
+class _MediaItem {
+  const _MediaItem({
+    required this.path,
+    required this.modified,
+    required this.kind,
+  });
+
+  final String path;
+  final DateTime modified;
+  final EntryKind kind;
+}
+
+class _MediaGroup {
+  const _MediaGroup({
+    required this.date,
+    required this.label,
+    required this.items,
+  });
+
+  final DateTime date;
+  final String label;
+  final List<_MediaItem> items;
+}
+
+class _MediaGalleryScreen extends ConsumerStatefulWidget {
+  const _MediaGalleryScreen({
+    required this.allowMultiple,
+    this.title,
+    this.initialDirectory,
+    this.actionLabel,
+  });
+
+  final bool allowMultiple;
+  final String? title;
+  final String? initialDirectory;
+  final String? actionLabel;
+
+  @override
+  ConsumerState<_MediaGalleryScreen> createState() =>
+      _MediaGalleryScreenState();
+}
+
+class _MediaGalleryScreenState extends ConsumerState<_MediaGalleryScreen> {
+  final _scroll = ScrollController();
+  final _selected = <String>{};
+  final _groupKeys = <GlobalKey>[];
+  var _groups = <_MediaGroup>[];
+  var _currentDateLabel = '';
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(_syncDateFromScroll);
+    _scan();
+  }
+
+  @override
+  void dispose() {
+    _scroll
+      ..removeListener(_syncDateFromScroll)
+      ..dispose();
+    super.dispose();
+  }
+
+  String _env(String key) => Platform.environment[key] ?? '';
+
+  List<Directory> _roots() {
+    final seen = <String>{};
+    final dirs = <Directory>[];
+    void add(String path) {
+      if (path.isEmpty) return;
+      final dir = Directory(path);
+      if (!dir.existsSync()) return;
+      final normalized = p.normalize(dir.path);
+      if (seen.add(normalized)) dirs.add(Directory(normalized));
+    }
+
+    final initial = widget.initialDirectory;
+    if (initial != null && initial.isNotEmpty) add(initial);
+
+    if (Platform.isAndroid) {
+      const base = '/storage/emulated/0';
+      add('$base/DCIM');
+      add('$base/Pictures');
+      add('$base/Movies');
+      add('$base/Download');
+      add(base);
+    } else if (Platform.isWindows) {
+      final home = _env('USERPROFILE');
+      add(p.join(home, 'Pictures'));
+      add(p.join(home, 'Videos'));
+      add(p.join(home, 'Downloads'));
+      add(p.join(home, 'Desktop'));
+    } else {
+      final home = _env('HOME');
+      add(p.join(home, 'Pictures'));
+      add(p.join(home, 'Movies'));
+      add(p.join(home, 'Videos'));
+      add(p.join(home, 'Downloads'));
+      add(p.join(home, 'Desktop'));
+    }
+    return dirs;
+  }
+
+  Future<void> _scan() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    final items = <_MediaItem>[];
+    final paths = <String>{};
+    try {
+      for (final root in _roots()) {
+        await _collectMedia(root, items, paths);
+      }
+      items.sort((a, b) => b.modified.compareTo(a.modified));
+      final groups = _group(items);
+      if (!mounted) return;
+      setState(() {
+        _groups = groups;
+        _groupKeys
+          ..clear()
+          ..addAll(List.generate(groups.length, (_) => GlobalKey()));
+        _currentDateLabel = groups.isEmpty ? '' : groups.first.label;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _error = ref.read(appStringsProvider).folderAccessError;
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _collectMedia(
+    Directory dir,
+    List<_MediaItem> items,
+    Set<String> paths,
+  ) async {
+    List<FileSystemEntity> children;
+    try {
+      children = await dir.list(followLinks: false).toList();
+    } catch (_) {
+      return;
+    }
+    for (final ent in children) {
+      final name = p.basename(ent.path);
+      if (name.startsWith('.')) continue;
+      if (ent is Directory) {
+        await _collectMedia(ent, items, paths);
+        continue;
+      }
+      if (ent is! File) continue;
+      final kind = kindForFile(ent.path);
+      if (kind != EntryKind.image &&
+          kind != EntryKind.video &&
+          !isCleanableDocument(ent.path)) {
+        continue;
+      }
+      final normalized = p.normalize(ent.path);
+      if (!paths.add(normalized)) continue;
+      FileStat stat;
+      try {
+        stat = await ent.stat();
+      } catch (_) {
+        continue;
+      }
+      items.add(_MediaItem(
+        path: normalized,
+        modified: stat.modified,
+        kind: kind,
+      ));
+    }
+  }
+
+  List<_MediaGroup> _group(List<_MediaItem> items) {
+    final byDay = <String, List<_MediaItem>>{};
+    for (final item in items) {
+      final key = _dayKey(item.modified);
+      byDay.putIfAbsent(key, () => []).add(item);
+    }
+    return [
+      for (final entry in byDay.entries)
+        _MediaGroup(
+          date: entry.value.first.modified,
+          label: _dateLabel(entry.value.first.modified),
+          items: entry.value,
+        ),
+    ];
+  }
+
+  String _dayKey(DateTime date) => '${date.year.toString().padLeft(4, '0')}-'
+      '${date.month.toString().padLeft(2, '0')}-'
+      '${date.day.toString().padLeft(2, '0')}';
+
+  String _dateLabel(DateTime date) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final day = DateTime(date.year, date.month, date.day);
+    final strings = ref.read(appStringsProvider);
+    if (day == today) return strings.today;
+    if (day == today.subtract(const Duration(days: 1))) {
+      return strings.yesterday;
+    }
+    const months = [
+      'janv.',
+      'févr.',
+      'mars',
+      'avr.',
+      'mai',
+      'juin',
+      'juil.',
+      'août',
+      'sept.',
+      'oct.',
+      'nov.',
+      'déc.',
+    ];
+    return '${date.day} ${months[date.month - 1]} ${date.year}';
+  }
+
+  void _syncDateFromScroll() {
+    if (_groups.isEmpty || !_scroll.hasClients) return;
+    final max = _scroll.position.maxScrollExtent;
+    final ratio = max <= 0 ? 0.0 : (_scroll.offset / max).clamp(0.0, 1.0);
+    final index = (ratio * (_groups.length - 1)).round();
+    final label = _groups[index].label;
+    if (label != _currentDateLabel) {
+      setState(() => _currentDateLabel = label);
+    }
+  }
+
+  void _jumpToRatio(double localDy, double height) {
+    if (_groups.isEmpty) return;
+    final ratio = (localDy / height).clamp(0.0, 1.0);
+    final index = (ratio * (_groups.length - 1)).round();
+    setState(() => _currentDateLabel = _groups[index].label);
+    final context = _groupKeys[index].currentContext;
+    if (context != null) {
+      Scrollable.ensureVisible(
+        context,
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        alignment: 0.02,
+      );
+    }
+  }
+
+  void _tap(_MediaItem item) {
+    if (!widget.allowMultiple) {
+      Navigator.of(context).pop(<String>[item.path]);
+      return;
+    }
+    setState(() {
+      if (!_selected.add(item.path)) _selected.remove(item.path);
+    });
+  }
+
+  void _confirm(AppStrings strings) {
+    if (_selected.isEmpty) return;
+    Navigator.of(context).pop(_selected.toList());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = ref.watch(appStringsProvider);
+    final title = widget.title ?? strings.selectMediaTitle;
+
+    return Scaffold(
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.close),
+          tooltip: strings.cancel,
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: Text(title),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: strings.refresh,
+            onPressed: _scan,
+          ),
+        ],
+      ),
+      body: _buildBody(strings),
+      bottomNavigationBar: widget.allowMultiple
+          ? _BottomBar(
+              child: Row(
+                children: [
+                  Text(strings.nSelected(_selected.length)),
+                  const Spacer(),
+                  FilledButton(
+                    onPressed:
+                        _selected.isEmpty ? null : () => _confirm(strings),
+                    child: Text(
+                        '${widget.actionLabel ?? strings.selectAction} (${_selected.length})'),
+                  ),
+                ],
+              ),
+            )
+          : null,
+    );
+  }
+
+  Widget _buildBody(AppStrings strings) {
+    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (_error != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Text(_error!, textAlign: TextAlign.center),
+        ),
+      );
+    }
+    if (_groups.isEmpty) {
+      return EmptyState(
+        icon: Icons.photo_library_outlined,
+        title: strings.noMedia,
+        message: strings.uploadMedia,
+      );
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final columns = width >= 1000
+            ? 6
+            : width >= 720
+                ? 5
+                : width >= 520
+                    ? 4
+                    : 3;
+        return Stack(
+          children: [
+            CustomScrollView(
+              controller: _scroll,
+              slivers: [
+                for (var i = 0; i < _groups.length; i++) ...[
+                  SliverToBoxAdapter(
+                    key: _groupKeys[i],
+                    child: Padding(
+                      padding:
+                          EdgeInsets.fromLTRB(16, i == 0 ? 16 : 36, 16, 12),
+                      child: Text(
+                        _groups[i].label,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                    ),
+                  ),
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    sliver: SliverGrid(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, itemIndex) {
+                          final item = _groups[i].items[itemIndex];
+                          return _MediaTile(
+                            item: item,
+                            selected: _selected.contains(item.path),
+                            onTap: () => _tap(item),
+                          );
+                        },
+                        childCount: _groups[i].items.length,
+                      ),
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: columns,
+                        mainAxisSpacing: 6,
+                        crossAxisSpacing: 6,
+                        childAspectRatio: 1,
+                      ),
+                    ),
+                  ),
+                ],
+                const SliverToBoxAdapter(child: SizedBox(height: 96)),
+              ],
+            ),
+            Positioned(
+              top: 16,
+              right: 8,
+              bottom: 16,
+              child: _TimelineRail(
+                label: _currentDateLabel,
+                onDrag: _jumpToRatio,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _MediaTile extends StatelessWidget {
+  const _MediaTile({
+    required this.item,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final _MediaItem item;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isImage =
+        item.kind == EntryKind.image && canRenderThumbnail(item.path);
+    return Material(
+      color: scheme.surfaceContainerHighest,
+      borderRadius: BorderRadius.circular(8),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (isImage)
+              Image.file(
+                File(item.path),
+                fit: BoxFit.cover,
+                cacheWidth: 260,
+                gaplessPlayback: true,
+                errorBuilder: (_, __, ___) =>
+                    Icon(Icons.broken_image_outlined, color: scheme.primary),
+              )
+            else
+              Center(
+                child: Icon(
+                  item.kind == EntryKind.video
+                      ? Icons.play_circle_outline
+                      : isCleanableDocument(item.path)
+                          ? Icons.picture_as_pdf_outlined
+                          : Icons.image_outlined,
+                  size: 40,
+                  color: scheme.primary,
+                ),
+              ),
+            if (item.kind == EntryKind.video)
+              Positioned(
+                left: 6,
+                bottom: 6,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.55),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    child: Icon(Icons.videocam, size: 14, color: Colors.white),
+                  ),
+                ),
+              ),
+            Positioned(
+              top: 6,
+              right: 6,
+              child: Icon(
+                selected ? Icons.check_circle : Icons.radio_button_unchecked,
+                color: selected ? scheme.primary : Colors.white,
+                shadows: const [Shadow(blurRadius: 4)],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TimelineRail extends StatelessWidget {
+  const _TimelineRail({
+    required this.label,
+    required this.onDrag,
+  });
+
+  final String label;
+  final void Function(double localDy, double height) onDrag;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return LayoutBuilder(
+      builder: (context, constraints) => GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onVerticalDragDown: (d) =>
+            onDrag(d.localPosition.dy, constraints.maxHeight),
+        onVerticalDragUpdate: (d) =>
+            onDrag(d.localPosition.dy, constraints.maxHeight),
+        onTapDown: (d) => onDrag(d.localPosition.dy, constraints.maxHeight),
+        child: SizedBox(
+          width: 72,
+          child: Column(
+            children: [
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: scheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(999),
+                  boxShadow: const [
+                    BoxShadow(blurRadius: 8, color: Colors.black26)
+                  ],
+                ),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  child: Text(
+                    label,
+                    maxLines: 2,
+                    textAlign: TextAlign.center,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: scheme.onPrimaryContainer,
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: Center(
+                  child: Container(
+                    width: 8,
+                    decoration: BoxDecoration(
+                      color: scheme.primary.withValues(alpha: 0.28),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _FileBrowserScreenState extends ConsumerState<_FileBrowserScreen> {
   Directory? _current;
   List<FileSystemEntity> _entries = const [];
   final Set<String> _selected = <String>{};
+  final List<Directory> _history = <Directory>[];
+  final _fileKindCache = <String, _FileKindCacheEntry>{};
   var _shortcuts = <_Shortcut>[];
   bool _loading = true;
   bool _multi = false;
@@ -77,11 +653,14 @@ class _FileBrowserScreenState extends ConsumerState<_FileBrowserScreen> {
     _multi = _fileMode && widget.allowMultiple;
     _shortcuts = _buildShortcuts();
     final start = widget.initialDirectory;
-    _load(Directory(
-      start != null && start.isNotEmpty && Directory(start).existsSync()
-          ? start
-          : _initialDir(),
-    ));
+    _load(
+      Directory(
+        start != null && start.isNotEmpty && Directory(start).existsSync()
+            ? start
+            : _initialDir(),
+      ),
+      remember: false,
+    );
   }
 
   // --- Locations -------------------------------------------------------------
@@ -148,7 +727,11 @@ class _FileBrowserScreenState extends ConsumerState<_FileBrowserScreen> {
 
   // --- Loading ---------------------------------------------------------------
 
-  Future<void> _load(Directory dir) async {
+  Future<void> _load(Directory dir, {bool remember = true}) async {
+    final previous = _current;
+    if (remember && previous != null && !p.equals(previous.path, dir.path)) {
+      _history.add(previous);
+    }
     setState(() {
       _loading = true;
       _error = null;
@@ -162,10 +745,7 @@ class _FileBrowserScreenState extends ConsumerState<_FileBrowserScreen> {
           items.add(ent);
         } else if (ent is File) {
           if (widget.mode == PickMode.directory) continue;
-          if (widget.mode == PickMode.imageFiles &&
-              kindForFile(name) != EntryKind.image) {
-            continue;
-          }
+          if (!await _isVisibleFile(ent.path)) continue;
           items.add(ent);
         }
       }
@@ -204,6 +784,14 @@ class _FileBrowserScreenState extends ConsumerState<_FileBrowserScreen> {
     final parent = cur.parent;
     if (p.equals(parent.path, cur.path)) return; // already at a root
     _load(parent);
+  }
+
+  bool get _canGoBackInBrowser => _history.isNotEmpty;
+
+  void _goBackInBrowser() {
+    if (_history.isEmpty) return;
+    final previous = _history.removeLast();
+    _load(previous, remember: false);
   }
 
   /// Prompts for a name and creates a sub-folder in the current directory,
@@ -255,8 +843,13 @@ class _FileBrowserScreenState extends ConsumerState<_FileBrowserScreen> {
 
   // --- Selection / confirmation ---------------------------------------------
 
-  void _onFileTap(File file) {
+  Future<void> _onFileTap(File file) async {
     if (!_multi) {
+      if (!await _isAcceptedForAction(file.path)) {
+        _snack(ref.read(appStringsProvider).fileNotAccepted);
+        return;
+      }
+      if (!mounted) return;
       Navigator.of(context).pop(<String>[file.path]);
       return;
     }
@@ -269,7 +862,63 @@ class _FileBrowserScreenState extends ConsumerState<_FileBrowserScreen> {
     });
   }
 
-  void _confirmFiles() => Navigator.of(context).pop(_selected.toList());
+  Future<void> _confirmFiles({bool move = false}) async {
+    final paths = _selected.toList();
+    final accepted = <String>[];
+    var rejected = 0;
+    for (final path in paths) {
+      if (await _isAcceptedForAction(path)) {
+        accepted.add(path);
+      } else {
+        rejected++;
+      }
+    }
+    if (rejected > 0) {
+      _snack(ref.read(appStringsProvider).filesNotAccepted(rejected));
+    }
+    if (accepted.isEmpty) return;
+    if (!mounted) return;
+    if (widget.showImportMoveActions) {
+      Navigator.of(context).pop((paths: accepted, move: move));
+    } else {
+      Navigator.of(context).pop(accepted);
+    }
+  }
+
+  Future<bool> _isAcceptedForAction(String path) async {
+    if (widget.mode != PickMode.imageFiles &&
+        widget.mode != PickMode.mediaFiles) {
+      return true;
+    }
+    final type = await FileSystemEntity.type(path);
+    if (type != FileSystemEntityType.file) return false;
+    final kind = await _kindForFile(path);
+    return widget.mode == PickMode.imageFiles
+        ? kind == EntryKind.image
+        : kind == EntryKind.image ||
+            kind == EntryKind.video ||
+            isCleanableDocument(path);
+  }
+
+  Future<bool> _isVisibleFile(String path) async {
+    if (widget.mode != PickMode.imageFiles &&
+        widget.mode != PickMode.mediaFiles) {
+      return true;
+    }
+    final kind = await _kindForFile(path);
+    return widget.mode == PickMode.imageFiles
+        ? kind == EntryKind.image
+        : kind == EntryKind.image ||
+            kind == EntryKind.video ||
+            isCleanableDocument(path);
+  }
+
+  void _snack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
 
   void _confirmDirectory() {
     final cur = _current;
@@ -278,7 +927,10 @@ class _FileBrowserScreenState extends ConsumerState<_FileBrowserScreen> {
 
   String _confirmLabel(AppStrings s) {
     if (widget.actionLabel != null) return widget.actionLabel!;
-    return widget.mode == PickMode.imageFiles ? s.selectAction : s.importAction;
+    return widget.mode == PickMode.imageFiles ||
+            widget.mode == PickMode.mediaFiles
+        ? s.selectAction
+        : s.importAction;
   }
 
   // --- Build -----------------------------------------------------------------
@@ -291,58 +943,63 @@ class _FileBrowserScreenState extends ConsumerState<_FileBrowserScreen> {
             ? strings.chooseDestination
             : widget.mode == PickMode.imageFiles
                 ? strings.selectImagesTitle
-                : strings.selectFilesTitle);
+                : widget.mode == PickMode.mediaFiles
+                    ? strings.selectMediaTitle
+                    : strings.selectFilesTitle);
 
-    return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.close),
-          tooltip: strings.cancel,
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: Text(title),
-        // Creating a folder only makes sense when choosing a destination —
-        // an import/attach browser only ever reads from the source side.
-        actions: [
-          if (widget.mode == PickMode.directory)
+    return PopScope<Object?>(
+      canPop: !_canGoBackInBrowser,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) _goBackInBrowser();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.close),
+            tooltip: strings.cancel,
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+          title: Text(title),
+          actions: [
             IconButton(
               icon: const Icon(Icons.create_new_folder_outlined),
               tooltip: strings.newFolder,
               onPressed:
                   (_current == null || _error != null) ? null : _createFolder,
             ),
-        ],
-      ),
-      body: Column(
-        children: [
-          _ShortcutsBar(
-            shortcuts: _shortcuts,
-            currentPath: _current?.path,
-            onTap: (path) => _load(Directory(path)),
-          ),
-          _PathBar(
-            path: _current?.path ?? '',
-            canGoUp: _current != null &&
-                !p.equals(_current!.parent.path, _current!.path),
-            onUp: _goUp,
-            upTooltip: strings.parentFolder,
-          ),
-          if (_fileMode && widget.allowMultiple)
-            CheckboxListTile(
-              dense: true,
-              controlAffinity: ListTileControlAffinity.leading,
-              value: _multi,
-              onChanged: (v) => setState(() {
-                _multi = v ?? false;
-                if (!_multi) _selected.clear();
-              }),
-              title: Text(strings.multipleSelection),
+          ],
+        ),
+        body: Column(
+          children: [
+            _ShortcutsBar(
+              shortcuts: _shortcuts,
+              currentPath: _current?.path,
+              onTap: (path) => _load(Directory(path)),
             ),
-          const Divider(height: 1),
-          Expanded(child: _buildList(strings)),
-        ],
+            _PathBar(
+              path: _current?.path ?? '',
+              canGoUp: _current != null &&
+                  !p.equals(_current!.parent.path, _current!.path),
+              onUp: _goUp,
+              upTooltip: strings.parentFolder,
+            ),
+            if (_fileMode && widget.allowMultiple)
+              CheckboxListTile(
+                dense: true,
+                controlAffinity: ListTileControlAffinity.leading,
+                value: _multi,
+                onChanged: (v) => setState(() {
+                  _multi = v ?? false;
+                  if (!_multi) _selected.clear();
+                }),
+                title: Text(strings.multipleSelection),
+              ),
+            const Divider(height: 1),
+            Expanded(child: _buildList(strings)),
+          ],
+        ),
+        bottomNavigationBar: _buildBottomBar(strings),
       ),
-      bottomNavigationBar: _buildBottomBar(strings),
     );
   }
 
@@ -416,13 +1073,44 @@ class _FileBrowserScreenState extends ConsumerState<_FileBrowserScreen> {
     }
     if (!_multi) return null; // single tap confirms directly
     final n = _selected.length;
+    if (widget.showImportMoveActions) {
+      return _BottomBar(
+        child: Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: n == 0 ? null : () => _confirmFiles(),
+                icon: const Icon(Icons.upload_file_outlined),
+                label: Text(
+                  '${strings.importAction} ($n)',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: n == 0 ? null : () => _confirmFiles(move: true),
+                icon: const Icon(Icons.drive_file_move_outlined),
+                label: Text(
+                  '${strings.move} ($n)',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
     return _BottomBar(
       child: Row(
         children: [
           Text(strings.nSelected(n)),
           const Spacer(),
           FilledButton(
-            onPressed: n == 0 ? null : _confirmFiles,
+            onPressed: n == 0 ? null : () => _confirmFiles(),
             child: Text('${_confirmLabel(strings)} ($n)'),
           ),
         ],
@@ -444,6 +1132,42 @@ class _FileBrowserScreenState extends ConsumerState<_FileBrowserScreen> {
     }
     return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
   }
+
+  Future<EntryKind> _kindForFile(String path) async {
+    final ext = p.extension(path).toLowerCase();
+    if (!tableExtensions.contains(ext)) return kindForFile(path);
+    FileStat stat;
+    try {
+      stat = await File(path).stat();
+    } catch (_) {
+      return EntryKind.other;
+    }
+    final cached = _fileKindCache[path];
+    if (cached != null &&
+        cached.modified == stat.modified &&
+        cached.size == stat.size) {
+      return cached.kind;
+    }
+    final kind = await kindForFilePath(path);
+    _fileKindCache[path] = _FileKindCacheEntry(
+      modified: stat.modified,
+      size: stat.size,
+      kind: kind,
+    );
+    return kind;
+  }
+}
+
+class _FileKindCacheEntry {
+  const _FileKindCacheEntry({
+    required this.modified,
+    required this.size,
+    required this.kind,
+  });
+
+  final DateTime modified;
+  final int size;
+  final EntryKind kind;
 }
 
 /// Thumbnail (for decodable images) or a type icon for a file row.
@@ -464,20 +1188,26 @@ class _FileLeading extends StatelessWidget {
           width: 40,
           height: 40,
           fit: BoxFit.cover,
+          gaplessPlayback: true,
           cacheWidth: 96,
           errorBuilder: (_, __, ___) =>
               Icon(Icons.image_outlined, color: scheme.primary),
         ),
       );
     }
-    final kind = kindForFile(name);
-    final icon = switch (kind) {
-      EntryKind.image => Icons.image_outlined,
-      EntryKind.video => Icons.videocam_outlined,
-      EntryKind.note => Icons.description_outlined,
-      _ => Icons.insert_drive_file_outlined,
-    };
-    return Icon(icon, color: scheme.onSurfaceVariant);
+    return FutureBuilder<EntryKind>(
+      future: kindForFilePath(file.path),
+      builder: (context, snapshot) {
+        final icon = switch (snapshot.data ?? kindForFile(name)) {
+          EntryKind.image => Icons.image_outlined,
+          EntryKind.video => Icons.videocam_outlined,
+          EntryKind.note => Icons.description_outlined,
+          EntryKind.table => Icons.table_chart_outlined,
+          _ => Icons.insert_drive_file_outlined,
+        };
+        return Icon(icon, color: scheme.onSurfaceVariant);
+      },
+    );
   }
 }
 

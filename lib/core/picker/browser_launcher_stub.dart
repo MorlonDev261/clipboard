@@ -14,3 +14,9 @@ Future<List<String>> launchInAppBrowser(
   String? actionLabel,
 }) async =>
     const [];
+
+Future<({List<String> paths, bool move})> launchInAppBrowserForImport(
+  BuildContext context, {
+  String? title,
+}) async =>
+    (paths: const <String>[], move: false);

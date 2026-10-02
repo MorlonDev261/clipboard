@@ -1,4 +1,5 @@
 import 'package:clipboard/core/formatting/list_format.dart';
+import 'package:clipboard/core/formatting/note_separator.dart';
 import 'package:clipboard/core/formatting/note_clipboard.dart';
 import 'package:clipboard/core/formatting/unicode_styler.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -203,6 +204,59 @@ void main() {
     test('anyRe strips either kind of prefix', () {
       expect('  • a'.replaceFirst(ListFormat.anyRe, ''), 'a');
       expect('  1. b'.replaceFirst(ListFormat.anyRe, ''), 'b');
+    });
+  });
+
+  group('NoteSeparator', () {
+    test('default separator only splits on blank lines', () {
+      expect(
+        NoteSeparator.segments(
+          'A line 1\nA line 2\n\nB line 1\nB line 2',
+          NoteSeparator.defaultSeparator,
+        ),
+        ['A line 1\nA line 2', 'B line 1\nB line 2'],
+      );
+    });
+
+    test('legacy single-newline default still only splits on blank lines', () {
+      expect(NoteSeparator.segments('A line 1\nA line 2\n\nB', '\n'), [
+        'A line 1\nA line 2',
+        'B',
+      ]);
+    });
+
+    test('default render preserves paragraph spacing for copy and share', () {
+      expect(
+        NoteSeparator.render(
+          'A line 1\nA line 2\n\nB line 1\nB line 2',
+          NoteSeparator.defaultSeparator,
+        ),
+        'A line 1\nA line 2\n\nB line 1\nB line 2',
+      );
+    });
+
+    test('custom separator already present in text is the only block boundary',
+        () {
+      expect(
+        NoteSeparator.segments('A\nline 2########B\nC', '########'),
+        ['A\nline 2', 'B\nC'],
+      );
+    });
+
+    test('render preserves line breaks when a custom separator is active', () {
+      expect(NoteSeparator.render('A\n\nB', '########'), 'A\n\nB');
+    });
+
+    test('render keeps custom-separated copy/share content in the same form',
+        () {
+      expect(
+        NoteSeparator.render('A\nline 2########B\nC', '########'),
+        'A\nline 2########B\nC',
+      );
+    });
+
+    test('normalization accepts escaped line breaks from text fields', () {
+      expect(NoteSeparator.normalize(r'---\n---'), '---\n---');
     });
   });
 

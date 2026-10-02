@@ -57,17 +57,17 @@ void main() {
         isTrue);
   });
 
-  test('importPaths avoids collisions by incrementing the copy name', () async {
-    File(p.join(workspace.path, 'doc.txt')).writeAsStringSync('existing');
+  test('importPaths converts txt files to md and avoids collisions', () async {
+    File(p.join(workspace.path, 'doc.md')).writeAsStringSync('existing');
     final src = File(p.join(outside.path, 'doc.txt'))
       ..writeAsStringSync('incoming');
 
     final failed = await repo.importPaths(workspace.path, [src.path]);
 
     expect(failed, isEmpty);
-    expect(await File(p.join(workspace.path, 'doc.txt')).readAsString(),
+    expect(await File(p.join(workspace.path, 'doc.md')).readAsString(),
         'existing');
-    expect(await File(p.join(workspace.path, 'doc (1).txt')).readAsString(),
+    expect(await File(p.join(workspace.path, 'doc (1).md')).readAsString(),
         'incoming');
   });
 
@@ -119,7 +119,48 @@ void main() {
     );
 
     expect(failed, [missing]);
-    expect(await File(p.join(workspace.path, 'one.txt')).exists(), isTrue);
-    expect(await File(p.join(workspace.path, 'two.txt')).exists(), isTrue);
+    expect(await File(p.join(workspace.path, 'one.md')).exists(), isTrue);
+    expect(await File(p.join(workspace.path, 'two.md')).exists(), isTrue);
+  });
+
+  test('importPaths imports compatible table json and generic json files',
+      () async {
+    final table = File(p.join(outside.path, 'table.json'))
+      ..writeAsStringSync('''
+{
+  "type": "influencor.table",
+  "version": 1,
+  "columns": [{"id": "name", "title": "Name", "type": "text"}],
+  "rows": [{"id": "row-1", "cells": {"name": "Ada"}}]
+}
+''');
+    final invalid = File(p.join(outside.path, 'data.json'))
+      ..writeAsStringSync('{"hello": "world"}');
+
+    final failed =
+        await repo.importPaths(workspace.path, [table.path, invalid.path]);
+
+    expect(failed, isEmpty);
+    expect(await File(p.join(workspace.path, 'table.json')).exists(), isTrue);
+    expect(await File(p.join(workspace.path, 'data.json')).exists(), isTrue);
+  });
+
+  test('importPaths copies folders recursively including generic files',
+      () async {
+    final srcDir = Directory(p.join(outside.path, 'mixed'))..createSync();
+    File(p.join(srcDir.path, 'ignored.pdf')).writeAsBytesSync([9]);
+    final deep = Directory(p.join(srcDir.path, 'a', 'b'))
+      ..createSync(recursive: true);
+    File(p.join(deep.path, 'note.txt')).writeAsStringSync('hello');
+
+    final failed = await repo.importPaths(workspace.path, [srcDir.path]);
+
+    expect(failed, isEmpty);
+    expect(await File(p.join(workspace.path, 'mixed', 'ignored.pdf')).exists(),
+        isTrue);
+    expect(
+      await File(p.join(workspace.path, 'mixed', 'a', 'b', 'note.md')).exists(),
+      isTrue,
+    );
   });
 }

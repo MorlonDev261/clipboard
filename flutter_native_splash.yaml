@@ -1,4 +1,4 @@
-# Native splash configuration for influencor.
+# Native splash configuration for Influencor.
 #
 # Values are taken from the app's existing identity:
 #   - color        -> AppColors.backgroundLight (#F8FAFC), the light background
@@ -7,7 +7,7 @@
 #                     logo variant to put on a blue background).
 #   - color_dark   -> AppColors.backgroundDark (#0F172A).
 #   - image        -> the existing app logo (assets/icon/icon.png).
-#   - branding     -> the app name "influencor", rendered from the app's own
+#   - branding     -> the app name "Influencor", rendered from the app's own
 #                     blue (#204DA0) since no separate branding image existed.
 #
 # On Android 12+ the branding is shown at the bottom (system constraint: the

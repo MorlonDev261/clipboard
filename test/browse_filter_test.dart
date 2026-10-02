@@ -76,7 +76,9 @@ void main() {
 
       final result = entriesForFilter(recursive, dir, EntryKind.image);
 
-      expect(_paths(result), [at(['HasImage'])]);
+      expect(_paths(result), [
+        at(['HasImage'])
+      ]);
     });
 
     test('uses the shallowest match to rank a folder', () {
@@ -94,7 +96,10 @@ void main() {
 
       final result = entriesForFilter(recursive, dir, EntryKind.image);
 
-      expect(_paths(result), [at(['A']), at(['B'])]);
+      expect(_paths(result), [
+        at(['A']),
+        at(['B'])
+      ]);
     });
 
     test('surfaces the direct child for media attached to a note deeper down',
@@ -109,7 +114,9 @@ void main() {
 
       final result = entriesForFilter(recursive, dir, EntryKind.image);
 
-      expect(_paths(result), [at(['Dossier'])]);
+      expect(_paths(result), [
+        at(['Dossier'])
+      ]);
     });
 
     test('skips the current folder\'s own hidden attachments', () {
@@ -123,7 +130,9 @@ void main() {
 
       // Only the folder with a real, browsable image — the current folder's own
       // hidden attachment is not a surfaceable entry.
-      expect(_paths(result), [at(['Real'])]);
+      expect(_paths(result), [
+        at(['Real'])
+      ]);
     });
   });
 
@@ -138,7 +147,10 @@ void main() {
 
       final result = entriesForFilter(recursive, dir, EntryKind.folder);
 
-      expect(_paths(result), [at(['Alpha']), at(['Beta'])]);
+      expect(_paths(result), [
+        at(['Alpha']),
+        at(['Beta'])
+      ]);
     });
   });
 

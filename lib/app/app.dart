@@ -4,6 +4,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/providers/settings_providers.dart';
+import '../features/reseller/presentation/reseller_link_handler.dart';
 import 'constants/app_constants.dart';
 import 'router.dart';
 import 'theme/app_theme.dart';
@@ -16,6 +17,8 @@ class ClipboardApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
     final settings = ref.watch(settingsProvider);
+    final materialLocale =
+        settings.languageCode == 'en' ? const Locale('en') : const Locale('fr');
 
     return MaterialApp.router(
       title: AppConstants.appName,
@@ -26,8 +29,12 @@ class ClipboardApp extends ConsumerWidget {
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: settings.themeMode,
-      locale: Locale(settings.languageCode),
+      locale: materialLocale,
       routerConfig: router,
+      builder: (context, child) => ResellerLinkHandler(
+        router: router,
+        child: child ?? const SizedBox.shrink(),
+      ),
       supportedLocales: const [Locale('fr'), Locale('en')],
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
@@ -50,4 +57,16 @@ class _AppScrollBehavior extends MaterialScrollBehavior {
         PointerDeviceKind.mouse,
         PointerDeviceKind.trackpad,
       };
+
+  @override
+  ScrollPhysics getScrollPhysics(BuildContext context) =>
+      const ClampingScrollPhysics();
+
+  @override
+  Widget buildOverscrollIndicator(
+    BuildContext context,
+    Widget child,
+    ScrollableDetails details,
+  ) =>
+      child;
 }

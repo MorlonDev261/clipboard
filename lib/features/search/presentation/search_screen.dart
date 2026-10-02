@@ -56,13 +56,21 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     });
   }
 
-  void _open(LibraryEntry e) {
+  void _open(LibraryEntry e, List<LibraryEntry> results) {
     if (e.isFolder) {
       context.push(browseRoute(e.path));
     } else if (e.isNote) {
       context.push(noteRoute(e.path));
+    } else if (e.isTable) {
+      context.push(tableRoute(e.path));
     } else {
-      context.push(previewRoute(e.path));
+      context.push(
+        previewRoute(e.path),
+        extra: [
+          for (final r in results)
+            if (!r.isFolder && !r.isNote && !r.isTable) r.path,
+        ],
+      );
     }
   }
 
@@ -125,6 +133,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                   );
                 }
                 return ListView.builder(
+                  padding: EdgeInsets.fromLTRB(
+                    0,
+                    0,
+                    0,
+                    MediaQuery.paddingOf(context).bottom + 88,
+                  ),
                   itemCount: results.length,
                   itemBuilder: (context, i) {
                     final e = results[i];
@@ -140,7 +154,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                       trailing: e.isFavorite
                           ? const Icon(Icons.star, size: 16)
                           : null,
-                      onTap: () => _open(e),
+                      onTap: () => _open(e, results),
                     );
                   },
                 );
@@ -168,6 +182,7 @@ class _FilterBar extends ConsumerWidget {
       (EntryKind.image, strings.images),
       (EntryKind.video, strings.videos),
       (EntryKind.note, strings.notes),
+      (EntryKind.table, strings.tables),
     ];
     return SizedBox(
       height: 48,
@@ -200,6 +215,8 @@ IconData _iconFor(EntryKind kind) {
       return Icons.image_outlined;
     case EntryKind.video:
       return Icons.videocam_outlined;
+    case EntryKind.table:
+      return Icons.table_chart_outlined;
     case EntryKind.other:
       return Icons.insert_drive_file_outlined;
   }

@@ -1,21 +1,30 @@
 import 'package:clipboard/core/l10n/app_strings.dart';
+import 'package:clipboard/features/library/application/library_providers.dart';
 import 'package:clipboard/features/library/domain/library_entry.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 // Lightweight, dependency-free tests (no filesystem, no UI boot).
 void main() {
   group('AppStrings', () {
-    test('defaults to French', () {
+    test('supports French', () {
       const strings = AppStrings(Locale('fr'));
       expect(strings.home, 'Accueil');
       expect(strings.newFolder, 'Nouveau dossier');
     });
 
-    test('falls back to English', () {
+    test('supports English', () {
       const strings = AppStrings(Locale('en'));
       expect(strings.home, 'Home');
       expect(strings.trash, 'Trash');
+    });
+
+    test('supports Malagasy and branded app name', () {
+      const strings = AppStrings(Locale('mg'));
+      expect(strings.home, 'Fandraisana');
+      expect(strings.add, 'Ampio');
+      expect(strings.appName, 'Influencor');
     });
   });
 
@@ -48,6 +57,46 @@ void main() {
       );
       expect(image.displayName, 'pic.png');
       expect(image.isMedia, isTrue);
+    });
+  });
+
+  group('Selection and Preview providers', () {
+    test('selectedEntriesProvider tracks selected paths', () {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      expect(container.read(selectedEntriesProvider), isEmpty);
+
+      container.read(selectedEntriesProvider.notifier).state = {
+        '/lib/pic1.png'
+      };
+      expect(
+          container.read(selectedEntriesProvider), contains('/lib/pic1.png'));
+
+      container.read(selectedEntriesProvider.notifier).state = {
+        '/lib/pic1.png',
+        '/lib/pic2.png',
+      };
+      expect(container.read(selectedEntriesProvider).length, 2);
+
+      // Deselect
+      final current = Set<String>.from(container.read(selectedEntriesProvider));
+      current.remove('/lib/pic1.png');
+      container.read(selectedEntriesProvider.notifier).state = current;
+      expect(
+          container.read(selectedEntriesProvider), equals({'/lib/pic2.png'}));
+    });
+
+    test('supports new localization strings for preview and selection', () {
+      const stringsFr = AppStrings(Locale('fr'));
+      expect(stringsFr.deselectAction, 'Désélectionner');
+      expect(stringsFr.previous, 'Précédent');
+      expect(stringsFr.next, 'Suivant');
+
+      const stringsEn = AppStrings(Locale('en'));
+      expect(stringsEn.deselectAction, 'Deselect');
+      expect(stringsEn.previous, 'Previous');
+      expect(stringsEn.next, 'Next');
     });
   });
 }

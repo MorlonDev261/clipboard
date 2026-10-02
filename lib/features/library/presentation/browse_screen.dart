@@ -12,6 +12,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:path/path.dart' as p;
 
+import '../../reseller/application/reseller_providers.dart';
 import '../../../app/constants/app_constants.dart';
 
 import '../../../app/nav.dart';
@@ -28,11 +29,11 @@ import '../../../core/providers/settings_providers.dart';
 
 import '../../../core/providers/workspace_providers.dart';
 
+import '../../../core/services/content_share_ui.dart';
+
 import '../../../core/widgets/empty_state.dart';
 
 import '../../../shared/enums/enums.dart';
-
-import '../../search/application/entry_search.dart';
 
 import '../application/browse_filtering.dart';
 
@@ -62,17 +63,10 @@ class BrowseScreen extends ConsumerStatefulWidget {
 class _BrowseScreenState extends ConsumerState<BrowseScreen> {
   bool _dragging = false;
 
-  bool _searchOpen = false;
-
-  final _searchController = TextEditingController();
-
-  Timer? _searchDebounce;
-
-  String _searchQuery = '';
-
   /// Paths currently selected for a batch action (move / delete). Selection
-  /// mode is active whenever this is non-empty.
-  final Set<String> _selected = <String>{};
+  /// mode is active whenever this is non-empty. Synchronized with the preview
+  /// screen so selections made while previewing media persist back in the list.
+  Set<String> get _selected => ref.watch(selectedEntriesProvider);
 
   bool get _selecting => _selected.isNotEmpty;
 
@@ -83,26 +77,44 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
   String get _dir => widget.dirPath;
 
   void _toggleSelect(String path) {
-    setState(() {
-      if (!_selected.remove(path)) _selected.add(path);
-    });
+    final current = ref.read(selectedEntriesProvider);
+    final next = Set<String>.from(current);
+    if (!next.remove(path)) {
+      next.add(path);
+    }
+    ref.read(selectedEntriesProvider.notifier).state = next;
   }
 
   void _startSelection(String path) {
-    setState(() => _selected.add(path));
+    final current = ref.read(selectedEntriesProvider);
+    ref.read(selectedEntriesProvider.notifier).state = {...current, path};
   }
 
   void _clearSelection() {
     if (_selected.isEmpty) return;
-    setState(_selected.clear);
+    ref.read(selectedEntriesProvider.notifier).state = <String>{};
   }
 
   void _selectAll(List<LibraryEntry> entries) {
-    setState(() {
-      _selected
-        ..clear()
-        ..addAll(entries.map((e) => e.path));
+    ref.read(selectedEntriesProvider.notifier).state =
+        entries.map((e) => e.path).toSet();
+  }
+
+  bool get _selectedOnlyImages {
+    if (_selected.isEmpty) return false;
+    final visibleByPath = {for (final entry in _visible) entry.path: entry};
+    return _selected.every((path) {
+      final entry = visibleByPath[path];
+      return (entry?.kind ?? kindForFile(p.basename(path))) == EntryKind.image;
     });
+  }
+
+  Future<void> _shareSelectedImages() async {
+    final strings = ref.read(appStringsProvider);
+    final paths = _selected.toList();
+    if (paths.isEmpty) return;
+
+    await shareWithFeedback(context, strings, text: null, mediaPaths: paths);
   }
 
   /// Moves every selected entry into a destination folder chosen inside the
@@ -169,6 +181,12 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
           tooltip: strings.selectAll,
           onPressed: allSelected ? _clearSelection : () => _selectAll(_visible),
         ),
+        if (_selectedOnlyImages)
+          IconButton(
+            icon: const Icon(Icons.ios_share),
+            tooltip: strings.share,
+            onPressed: _shareSelectedImages,
+          ),
         IconButton(
           icon: const Icon(Icons.drive_file_move_outlined),
           tooltip: strings.move,
@@ -185,35 +203,11 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
 
   @override
   void dispose() {
-    _searchDebounce?.cancel();
-
-    _searchController.dispose();
-
     super.dispose();
   }
 
   void _openSearch() {
-    setState(() => _searchOpen = true);
-  }
-
-  void _closeSearch() {
-    _searchDebounce?.cancel();
-
-    _searchController.clear();
-
-    setState(() {
-      _searchOpen = false;
-
-      _searchQuery = '';
-    });
-  }
-
-  void _onSearchChanged(String value) {
-    _searchDebounce?.cancel();
-
-    _searchDebounce = Timer(AppConstants.searchDebounce, () {
-      if (mounted) setState(() => _searchQuery = value.trim());
-    });
+    context.push(searchRoute());
   }
 
   @override
@@ -246,23 +240,20 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
 
     final titleWidget = widget.showBack
         ? Text(isRoot ? strings.library : p.basename(_dir))
-        : const AppHeaderTitle();
+        : const AppHeaderTitle(showModeBadge: true);
 
     return Scaffold(
       appBar: _selecting
           ? _buildSelectionBar(strings)
           : AppBar(
-              automaticallyImplyLeading: !_searchOpen && widget.showBack,
-              titleSpacing: _searchOpen ? 0.0 : null,
-              leading: _searchOpen
-                  ? IconButton(
-                      tooltip: strings.cancel,
-                      icon: const Icon(Icons.arrow_back),
-                      onPressed: _closeSearch,
-                    )
-                  : widget.showBack
-                      ? BackButton(onPressed: () => _back(context))
+              toolbarHeight:
+                  !widget.showBack && ref.watch(modeBadgeVisibleProvider)
+                      ? AppHeaderTitle.heightWithBadge
                       : null,
+              automaticallyImplyLeading: widget.showBack,
+              leading: widget.showBack
+                  ? BackButton(onPressed: () => _back(context))
+                  : null,
               title: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 250),
                 switchInCurve: Curves.easeOut,
@@ -277,68 +268,40 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
                     child: child,
                   ),
                 ),
-                child: _searchOpen
-                    ? TextField(
-                        key: const ValueKey('browse-search-field'),
-                        controller: _searchController,
-                        autofocus: true,
-                        textInputAction: TextInputAction.search,
-                        onChanged: _onSearchChanged,
-                        decoration: InputDecoration(
-                          hintText: strings.searchHint,
-                          border: InputBorder.none,
-                        ),
-                      )
-                    : KeyedSubtree(
-                        key: const ValueKey('browse-title'),
-                        child: titleWidget,
-                      ),
+                child: KeyedSubtree(
+                  key: const ValueKey('browse-title'),
+                  child: titleWidget,
+                ),
               ),
-              actions: _searchOpen
-                  ? [
-                      if (_searchQuery.isNotEmpty ||
-                          _searchController.text.isNotEmpty)
-                        IconButton(
-                          tooltip: strings.clear,
-                          icon: const Icon(Icons.clear),
-                          onPressed: () {
-                            _searchDebounce?.cancel();
-
-                            _searchController.clear();
-
-                            setState(() => _searchQuery = '');
-                          },
-                        ),
-                    ]
-                  : [
-                      IconButton(
-                        tooltip: strings.search,
-                        icon: const Icon(Icons.search),
-                        onPressed: _openSearch,
-                      ),
-                      _SortMenu(),
-                      IconButton(
-                        tooltip: strings.refresh,
-                        icon: const Icon(Icons.refresh),
-                        onPressed: () {
-                          ref.invalidate(directoryProvider(_dir));
-                          ref.invalidate(dirStatsProvider(_dir));
-                        },
-                      ),
-                      IconButton(
-                        tooltip: strings.contents,
-                        icon: Icon(viewMode == ViewMode.grid
-                            ? Icons.view_list_outlined
-                            : Icons.grid_view_outlined),
-                        onPressed: () => ref
-                            .read(settingsControllerProvider.notifier)
-                            .setViewMode(viewMode == ViewMode.grid
-                                ? ViewMode.list
-                                : ViewMode.grid),
-                      ),
-                    ],
+              actions: [
+                IconButton(
+                  tooltip: strings.search,
+                  icon: const Icon(Icons.search),
+                  onPressed: _openSearch,
+                ),
+                _SortMenu(),
+                IconButton(
+                  tooltip: strings.refresh,
+                  icon: const Icon(Icons.refresh),
+                  onPressed: () {
+                    ref.invalidate(directoryProvider(_dir));
+                    ref.invalidate(dirStatsProvider(_dir));
+                  },
+                ),
+                IconButton(
+                  tooltip: strings.contents,
+                  icon: Icon(viewMode == ViewMode.grid
+                      ? Icons.view_list_outlined
+                      : Icons.grid_view_outlined),
+                  onPressed: () => ref
+                      .read(settingsControllerProvider.notifier)
+                      .setViewMode(viewMode == ViewMode.grid
+                          ? ViewMode.list
+                          : ViewMode.grid),
+                ),
+              ],
             ),
-      floatingActionButton: _searchOpen || _selecting
+      floatingActionButton: _selecting
           ? null
           : FloatingActionButton.extended(
               onPressed: () => _showAddSheet(context),
@@ -362,48 +325,34 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
         },
         child: Stack(
           children: [
-            _searchOpen
-                ? Column(
-                    children: [
-                      _FilterBar(),
-                      Expanded(child: _SearchResults(query: _searchQuery)),
-                    ],
-                  )
-                : Column(
-                    children: [
-                      if (root != null) _Breadcrumb(root: root, dir: _dir),
-                      _StatsCards(dir: _dir),
-                      _FilterBar(),
-                      Expanded(
-                        child: listing.when(
+            Column(
+              children: [
+                if (root != null) _Breadcrumb(root: root, dir: _dir),
+                _DeferredStatsCards(dir: _dir),
+                _FilterBar(),
+                Expanded(
+                  child: listing.value == null
+                      ? listing.when(
                           loading: () =>
                               const Center(child: CircularProgressIndicator()),
                           error: (e, _) =>
                               Center(child: Text(strings.genericError)),
-                          data: (entries) {
-                            final visible = filter == null
-                                ? sortEntries(entries, sort)
-                                : entriesForFilter(entries, _dir, filter);
-                            _visible = visible;
-
-                            if (visible.isEmpty) {
-                              return _EmptyBrowse(dropping: _dragging);
-                            }
-
-                            return _EntryView(
-                              dir: _dir,
-                              entries: visible,
-                              viewMode: viewMode,
-                              selected: _selected,
-                              selecting: _selecting,
-                              onToggle: _toggleSelect,
-                              onStartSelection: _startSelection,
-                            );
-                          },
+                          data: (entries) => _buildEntries(
+                            entries: entries,
+                            filter: filter,
+                            sort: sort,
+                            viewMode: viewMode,
+                          ),
+                        )
+                      : _buildEntries(
+                          entries: listing.value!,
+                          filter: filter,
+                          sort: sort,
+                          viewMode: viewMode,
                         ),
-                      ),
-                    ],
-                  ),
+                ),
+              ],
+            ),
             if (_dragging) _DropOverlay(label: strings.dropToImport),
           ],
         ),
@@ -412,11 +361,38 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
   }
 
   void _back(BuildContext context) {
+    _clearSelection();
     if (context.canPop()) {
       context.pop();
     } else {
       context.go('/');
     }
+  }
+
+  Widget _buildEntries({
+    required List<LibraryEntry> entries,
+    required EntryKind? filter,
+    required SortOption sort,
+    required ViewMode viewMode,
+  }) {
+    final visible = filter == null
+        ? sortEntries(entries, sort)
+        : entriesForFilter(entries, _dir, filter);
+    _visible = visible;
+
+    if (visible.isEmpty) {
+      return _EmptyBrowse(dropping: _dragging);
+    }
+
+    return _EntryView(
+      dir: _dir,
+      entries: visible,
+      viewMode: viewMode,
+      selected: _selected,
+      selecting: _selecting,
+      onToggle: _toggleSelect,
+      onStartSelection: _startSelection,
+    );
   }
 
   Future<void> _showAddSheet(BuildContext context) async {
@@ -447,21 +423,14 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
                 context.push(newNoteRoute(_dir));
               },
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-              child: _ImportMoveRow(
-                strings: strings,
-                onImport: () {
-                  Navigator.pop(sheetContext);
+            ListTile(
+              leading: const Icon(Icons.upload_file_outlined),
+              title: Text(strings.importFiles),
+              onTap: () {
+                Navigator.pop(sheetContext);
 
-                  _pickAndImport();
-                },
-                onMove: () {
-                  Navigator.pop(sheetContext);
-
-                  _pickAndMove();
-                },
-              ),
+                _pickAndImport();
+              },
             ),
           ],
         ),
@@ -494,31 +463,13 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
   Future<void> _pickAndImport() async {
     final strings = ref.read(appStringsProvider);
 
-    final paths = await AppFilePicker.pick(
+    final result = await AppFilePicker.pickForImport(
       context,
-      mode: PickMode.files,
       title: strings.importFiles,
     );
 
-    if (paths.isNotEmpty) {
-      await _import(paths);
-    }
-  }
-
-  /// Like [_pickAndImport], but cuts the picked files out of their original
-  /// location instead of leaving a copy behind.
-  Future<void> _pickAndMove() async {
-    final strings = ref.read(appStringsProvider);
-
-    final paths = await AppFilePicker.pick(
-      context,
-      mode: PickMode.files,
-      title: strings.moveFilesIn,
-      actionLabel: strings.move,
-    );
-
-    if (paths.isNotEmpty) {
-      await _import(paths, move: true);
+    if (result.paths.isNotEmpty) {
+      await _import(result.paths, move: result.move);
     }
   }
 
@@ -545,80 +496,6 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
     ScaffoldMessenger.of(context)
       ..clearSnackBars()
       ..showSnackBar(SnackBar(content: Text(message)));
-  }
-}
-
-/// The "Importer" / "Déplacer" pair in the add sheet, shown side by side.
-/// When both labels don't fit the available width, "Déplacer" collapses to
-/// an icon-only button so the row never wraps onto a second line.
-class _ImportMoveRow extends StatelessWidget {
-  const _ImportMoveRow({
-    required this.strings,
-    required this.onImport,
-    required this.onMove,
-  });
-
-  final AppStrings strings;
-  final VoidCallback onImport;
-  final VoidCallback onMove;
-
-  // Estimated chrome (icon + gap + horizontal padding) around a button's
-  // label, used to judge whether both buttons fit on one line.
-  static const _buttonChrome = 76.0;
-  static const _gap = 12.0;
-
-  double _labelWidth(BuildContext context, String label) {
-    final painter = TextPainter(
-      text: TextSpan(
-        text: label,
-        style: Theme.of(context).textTheme.labelLarge,
-      ),
-      textDirection: Directionality.of(context),
-    )..layout();
-    return painter.width;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final importLabel = strings.importAction;
-    final moveLabel = strings.move;
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final needed = _labelWidth(context, importLabel) +
-            _labelWidth(context, moveLabel) +
-            _buttonChrome * 2 +
-            _gap;
-        final fitsBoth = needed <= constraints.maxWidth;
-
-        return Row(
-          children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: onImport,
-                icon: const Icon(Icons.upload_file_outlined),
-                label: Text(importLabel),
-              ),
-            ),
-            const SizedBox(width: _gap),
-            if (fitsBoth)
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: onMove,
-                  icon: const Icon(Icons.drive_file_move_outlined),
-                  label: Text(moveLabel),
-                ),
-              )
-            else
-              IconButton.outlined(
-                onPressed: onMove,
-                tooltip: strings.moveFilesIn,
-                icon: const Icon(Icons.drive_file_move_outlined),
-              ),
-          ],
-        );
-      },
-    );
   }
 }
 
@@ -650,22 +527,58 @@ class _SortMenu extends ConsumerWidget {
 
 /// Dynamic stat cards for the current folder (recursive: folder + subfolders).
 
-class _StatsCards extends ConsumerWidget {
-  const _StatsCards({required this.dir});
+class _DeferredStatsCards extends ConsumerStatefulWidget {
+  const _DeferredStatsCards({required this.dir});
 
   final String dir;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_DeferredStatsCards> createState() =>
+      _DeferredStatsCardsState();
+}
+
+class _DeferredStatsCardsState extends ConsumerState<_DeferredStatsCards> {
+  Timer? _timer;
+  bool _loadStats = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer(const Duration(milliseconds: 350), () {
+      if (mounted) setState(() => _loadStats = true);
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant _DeferredStatsCards oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.dir == widget.dir) return;
+    _timer?.cancel();
+    _loadStats = false;
+    _timer = Timer(const Duration(milliseconds: 350), () {
+      if (mounted) setState(() => _loadStats = true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final strings = ref.watch(appStringsProvider);
 
-    final stats = ref.watch(dirStatsProvider(dir)).value;
+    final stats =
+        _loadStats ? ref.watch(dirStatsProvider(widget.dir)).value : null;
 
     final items = <(IconData, String, int?)>[
       (Icons.folder_outlined, strings.folders, stats?.folders),
       (Icons.image_outlined, strings.images, stats?.images),
       (Icons.videocam_outlined, strings.videos, stats?.videos),
       (Icons.notes_outlined, strings.notes, stats?.notes),
+      (Icons.table_chart_outlined, strings.tables, stats?.tables),
     ];
 
     return Padding(
@@ -725,6 +638,7 @@ class _FilterBar extends ConsumerWidget {
       (EntryKind.image, strings.images),
       (EntryKind.video, strings.videos),
       (EntryKind.note, strings.notes),
+      (EntryKind.table, strings.tables),
     ];
 
     return SizedBox(
@@ -739,89 +653,15 @@ class _FilterBar extends ConsumerWidget {
               child: ChoiceChip(
                 label: Text(label),
                 selected: current == kind,
-                onSelected: (_) =>
-                    ref.read(browseFilterProvider.notifier).state = kind,
+                onSelected: (_) {
+                  if (current != kind) {
+                    ref.read(browseFilterProvider.notifier).state = kind;
+                  }
+                },
               ),
             ),
         ],
       ),
-    );
-  }
-}
-
-/// Global search results (whole workspace, names + tags), shown in place of the
-/// browse listing while the header search field is open. Honours the shared
-/// kind filter from [_FilterBar].
-class _SearchResults extends ConsumerWidget {
-  const _SearchResults({required this.query});
-
-  final String query;
-
-  void _open(BuildContext context, LibraryEntry e) {
-    if (e.isFolder) {
-      context.push(browseRoute(e.path));
-    } else if (e.isNote) {
-      context.push(noteRoute(e.path));
-    } else {
-      context.push(previewRoute(e.path));
-    }
-  }
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final strings = ref.watch(appStringsProvider);
-
-    final root = ref.watch(workspaceRootProvider);
-
-    final filter = ref.watch(browseFilterProvider);
-
-    final index = ref.watch(libraryIndexProvider);
-
-    return index.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text(strings.genericError)),
-      data: (all) {
-        final results = all
-            .where((e) => filter == null || e.kind == filter)
-            .where((e) => entryMatchesQuery(e, query))
-            .toList();
-
-        if (query.isEmpty && filter == null) {
-          return EmptyState(
-            icon: Icons.search,
-            title: strings.search,
-            message: strings.searchPrompt,
-          );
-        }
-
-        if (results.isEmpty) {
-          return EmptyState(
-            icon: Icons.search_off,
-            title: strings.noResults,
-            message: strings.searchHint,
-          );
-        }
-
-        return ListView.builder(
-          itemCount: results.length,
-          itemBuilder: (context, i) {
-            final e = results[i];
-
-            final folder =
-                root == null ? '' : p.dirname(p.relative(e.path, from: root));
-
-            return ListTile(
-              leading: Icon(_iconFor(e.kind)),
-              title: Text(e.displayName),
-              subtitle: Text(folder == '.'
-                  ? strings.library
-                  : '${strings.inFolder} $folder'),
-              trailing: e.isFavorite ? const Icon(Icons.star, size: 16) : null,
-              onTap: () => _open(context, e),
-            );
-          },
-        );
-      },
     );
   }
 }
@@ -908,11 +748,11 @@ class _EntryView extends ConsumerWidget {
 
   final void Function(String path) onStartSelection;
 
-  void _tap(BuildContext context, LibraryEntry e) {
+  void _tap(BuildContext context, WidgetRef ref, LibraryEntry e) {
     if (selecting) {
       onToggle(e.path);
     } else {
-      _open(context, e);
+      _open(context, ref, e);
     }
   }
 
@@ -924,11 +764,14 @@ class _EntryView extends ConsumerWidget {
     }
   }
 
-  void _open(BuildContext context, LibraryEntry e) {
+  void _open(BuildContext context, WidgetRef ref, LibraryEntry e) {
     if (e.isFolder) {
+      ref.read(selectedEntriesProvider.notifier).state = <String>{};
       context.push(browseRoute(e.path));
     } else if (e.isNote) {
       context.push(noteRoute(e.path));
+    } else if (e.isTable) {
+      context.push(tableRoute(e.path));
     } else {
       context.push(previewRoute(e.path));
     }
@@ -936,9 +779,21 @@ class _EntryView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final compact =
+        MediaQuery.sizeOf(context).width < AppConstants.desktopBreakpoint;
+    final bottomPadding = AppConstants.defaultPadding +
+        MediaQuery.paddingOf(context).bottom +
+        (selecting ? 12 : 112);
+    final contentPadding = EdgeInsets.fromLTRB(
+      AppConstants.defaultPadding,
+      AppConstants.defaultPadding,
+      AppConstants.defaultPadding,
+      bottomPadding,
+    );
+
     if (viewMode == ViewMode.list) {
       return ListView.builder(
-        padding: const EdgeInsets.all(AppConstants.defaultPadding),
+        padding: contentPadding,
         itemCount: entries.length,
         itemBuilder: (context, i) {
           final e = entries[i];
@@ -947,23 +802,31 @@ class _EntryView extends ConsumerWidget {
 
           return Card(
             child: ListTile(
+              contentPadding: const EdgeInsetsDirectional.only(
+                start: 12,
+                end: 4,
+              ),
               selected: isSelected,
-              leading: selecting
+              leading: selecting && !compact
                   ? Checkbox(
                       value: isSelected,
                       onChanged: (_) => onToggle(e.path),
                     )
-                  : _EntryThumb(entry: e, size: 40),
+                  : _SelectableEntryThumb(
+                      entry: e,
+                      selected: isSelected,
+                      selecting: selecting,
+                    ),
               title: Text(e.displayName),
               subtitle: e.isFolder ? _tagsLine(e) : _fileSubtitle(e),
               trailing: selecting
                   ? null
-                  : _EntryMenu(
+                  : _EntryTrailingActions(
                       dir: dir,
                       entry: e,
                       onSelect: () => onStartSelection(e.path),
                     ),
-              onTap: () => _tap(context, e),
+              onTap: () => _tap(context, ref, e),
               onLongPress: () => _longPress(e),
             ),
           );
@@ -971,13 +834,10 @@ class _EntryView extends ConsumerWidget {
       );
     }
 
-    final columns =
-        MediaQuery.sizeOf(context).width >= AppConstants.desktopBreakpoint
-            ? 4
-            : 2;
+    final columns = compact ? 2 : 4;
 
     return GridView.builder(
-      padding: const EdgeInsets.all(AppConstants.defaultPadding),
+      padding: contentPadding,
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: columns,
         mainAxisSpacing: 12,
@@ -1002,7 +862,7 @@ class _EntryView extends ConsumerWidget {
                 )
               : null,
           child: InkWell(
-            onTap: () => _tap(context, e),
+            onTap: () => _tap(context, ref, e),
             onLongPress: () => _longPress(e),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1012,7 +872,7 @@ class _EntryView extends ConsumerWidget {
                     fit: StackFit.expand,
                     children: [
                       _EntryThumb(entry: e, fill: true),
-                      if (selecting)
+                      if (selecting && !compact)
                         Positioned(
                           top: 4,
                           left: 4,
@@ -1021,19 +881,23 @@ class _EntryView extends ConsumerWidget {
                             onChanged: (_) => onToggle(e.path),
                           ),
                         ),
+                      if (selecting && compact && isSelected)
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: Icon(
+                            Icons.check_circle,
+                            color: Theme.of(context).colorScheme.primary,
+                            shadows: const [Shadow(blurRadius: 4)],
+                          ),
+                        ),
                     ],
                   ),
                 ),
                 Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  padding: const EdgeInsetsDirectional.fromSTEB(8, 6, 0, 6),
                   child: Row(
                     children: [
-                      if (e.isFavorite)
-                        const Padding(
-                          padding: EdgeInsets.only(right: 4),
-                          child: Icon(Icons.star, size: 14),
-                        ),
                       Expanded(
                         child: Text(
                           e.displayName,
@@ -1043,7 +907,7 @@ class _EntryView extends ConsumerWidget {
                         ),
                       ),
                       if (!selecting)
-                        _EntryMenu(
+                        _EntryTrailingActions(
                           dir: dir,
                           entry: e,
                           dense: true,
@@ -1061,7 +925,7 @@ class _EntryView extends ConsumerWidget {
   }
 
   Widget? _tagsLine(LibraryEntry e) =>
-      e.tags.isEmpty ? null : Text('#${e.tags.join(' #')}');
+      e.tags.isEmpty ? null : _TagBadges(tags: e.tags);
 
   Widget _fileSubtitle(LibraryEntry e) {
     final kb = e.size / 1024;
@@ -1070,9 +934,57 @@ class _EntryView extends ConsumerWidget {
         ? '${kb.toStringAsFixed(0)} Ko'
         : '${(kb / 1024).toStringAsFixed(1)} Mo';
 
-    final tags = e.tags.isEmpty ? '' : '  ·  #${e.tags.join(' #')}';
+    if (e.tags.isEmpty) {
+      return Text(size, maxLines: 1, overflow: TextOverflow.ellipsis);
+    }
 
-    return Text('$size$tags', maxLines: 1, overflow: TextOverflow.ellipsis);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(size, maxLines: 1, overflow: TextOverflow.ellipsis),
+        const SizedBox(height: 4),
+        _TagBadges(tags: e.tags),
+      ],
+    );
+  }
+}
+
+class _TagBadges extends StatelessWidget {
+  const _TagBadges({required this.tags});
+
+  final List<String> tags;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Wrap(
+      spacing: 6,
+      runSpacing: 4,
+      children: [
+        for (final tag in tags)
+          Container(
+            constraints: const BoxConstraints(maxWidth: 120),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: scheme.secondaryContainer,
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(
+                color: scheme.secondary.withValues(alpha: 0.20),
+              ),
+            ),
+            child: Text(
+              tag,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: scheme.onSecondaryContainer,
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+          ),
+      ],
+    );
   }
 }
 
@@ -1097,6 +1009,7 @@ class _EntryThumb extends StatelessWidget {
         fit: BoxFit.cover,
         width: fill ? double.infinity : size,
         height: fill ? double.infinity : size,
+        gaplessPlayback: true,
         cacheWidth: fill ? 400 : 96,
         errorBuilder: (_, __, ___) =>
             Icon(Icons.broken_image_outlined, color: color, size: size ?? 40),
@@ -1121,6 +1034,91 @@ class _EntryThumb extends StatelessWidget {
   }
 }
 
+class _SelectableEntryThumb extends StatelessWidget {
+  const _SelectableEntryThumb({
+    required this.entry,
+    required this.selected,
+    required this.selecting,
+  });
+
+  final LibraryEntry entry;
+  final bool selected;
+  final bool selecting;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return SizedBox(
+      width: 44,
+      height: 44,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Center(child: _EntryThumb(entry: entry, size: 40)),
+          if (selecting && selected)
+            Positioned(
+              right: -2,
+              top: -2,
+              child: Icon(
+                Icons.check_circle,
+                size: 18,
+                color: scheme.primary,
+                shadows: const [Shadow(blurRadius: 4)],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EntryTrailingActions extends StatelessWidget {
+  const _EntryTrailingActions({
+    required this.dir,
+    required this.entry,
+    required this.onSelect,
+    this.dense = false,
+  });
+
+  final String dir;
+
+  final LibraryEntry entry;
+
+  final VoidCallback onSelect;
+
+  final bool dense;
+
+  @override
+  Widget build(BuildContext context) {
+    final starSize = dense ? 15.0 : 18.0;
+    final menuSize = dense ? 30.0 : 36.0;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (entry.isFavorite)
+          Padding(
+            padding: EdgeInsetsDirectional.only(end: dense ? 0 : 2),
+            child: Icon(
+              Icons.star,
+              size: starSize,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ),
+        SizedBox.square(
+          dimension: menuSize,
+          child: _EntryMenu(
+            dir: dir,
+            entry: entry,
+            dense: dense,
+            onSelect: onSelect,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _EntryMenu extends ConsumerWidget {
   const _EntryMenu({
     required this.dir,
@@ -1141,28 +1139,27 @@ class _EntryMenu extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final strings = ref.watch(appStringsProvider);
+    final ctrl = ref.read(libraryControllerProvider);
 
-    final controller = ref.read(libraryControllerProvider);
-
-    return PopupMenuButton<String>(
-      icon: dense ? const Icon(Icons.more_vert, size: 18) : null,
-      onSelected: (value) async {
+    Future<void> act(String value) async {
+      try {
         switch (value) {
           case 'select':
             onSelect();
 
           case 'favorite':
-            await controller.setFavorite(entry.path, !entry.isFavorite,
+            await ctrl.setFavorite(entry.path, !entry.isFavorite,
                 parentDir: dir);
 
           case 'tags':
+            if (!context.mounted) return;
             final tags = await _promptTags(context, strings, entry.tags);
-
             if (tags != null) {
-              await controller.setTags(entry.path, tags, parentDir: dir);
+              await ctrl.setTags(entry.path, tags, parentDir: dir);
             }
 
           case 'rename':
+            if (!context.mounted) return;
             final name = await promptForName(
               context,
               title: strings.renameTitle,
@@ -1171,48 +1168,103 @@ class _EntryMenu extends ConsumerWidget {
               cancelLabel: strings.cancel,
               initialValue: entry.displayName,
             );
-
             if (name != null && name.trim().isNotEmpty) {
-              await controller.rename(entry.path, name.trim(), parentDir: dir);
+              await ctrl.rename(entry.path, name.trim(), parentDir: dir);
             }
 
           case 'move':
+            if (!context.mounted) return;
             final dests = await AppFilePicker.pick(
               context,
               mode: PickMode.directory,
               title: strings.chooseDestination,
             );
-
             if (dests.isNotEmpty && !p.equals(dests.first, dir)) {
-              await controller.move(entry.path, dests.first, parentDir: dir);
+              await ctrl.move(entry.path, dests.first, parentDir: dir);
             }
 
           case 'duplicate':
-            await controller.duplicate(entry.path, parentDir: dir);
+            await ctrl.duplicate(entry.path, parentDir: dir);
 
           case 'delete':
+            if (!context.mounted) return;
             final ok = await confirmDelete(context, strings);
-
             if (ok == true) {
-              await controller.moveToTrash(entry.path, parentDir: dir);
+              await ctrl.moveToTrash(entry.path, parentDir: dir);
             }
         }
-      },
-      itemBuilder: (context) => [
-        PopupMenuItem(value: 'select', child: Text(strings.selectAction)),
-        const PopupMenuDivider(),
-        PopupMenuItem(
-          value: 'favorite',
+      } catch (_) {
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context)
+          ..clearSnackBars()
+          ..showSnackBar(SnackBar(content: Text(strings.genericError)));
+      }
+    }
+
+    return MenuAnchor(
+      menuChildren: [
+        MenuItemButton(
+          onPressed: () => act('select'),
+          child: Text(strings.selectAction),
+        ),
+        const Divider(height: 1),
+        MenuItemButton(
+          onPressed: () => act('favorite'),
+          leadingIcon: Icon(
+            entry.isFavorite ? Icons.star : Icons.star_border,
+            size: 18,
+          ),
           child: Text(entry.isFavorite
               ? strings.removeFromFavorites
               : strings.addToFavorites),
         ),
-        PopupMenuItem(value: 'tags', child: Text(strings.editTags)),
-        PopupMenuItem(value: 'rename', child: Text(strings.rename)),
-        PopupMenuItem(value: 'move', child: Text(strings.move)),
-        PopupMenuItem(value: 'duplicate', child: Text(strings.duplicate)),
-        PopupMenuItem(value: 'delete', child: Text(strings.delete)),
+        MenuItemButton(
+          onPressed: () => act('tags'),
+          leadingIcon: const Icon(Icons.label_outline, size: 18),
+          child: Text(strings.editTags),
+        ),
+        MenuItemButton(
+          onPressed: () => act('rename'),
+          leadingIcon: const Icon(Icons.drive_file_rename_outline, size: 18),
+          child: Text(strings.rename),
+        ),
+        MenuItemButton(
+          onPressed: () => act('move'),
+          leadingIcon: const Icon(Icons.drive_file_move_outline, size: 18),
+          child: Text(strings.move),
+        ),
+        MenuItemButton(
+          onPressed: () => act('duplicate'),
+          leadingIcon: const Icon(Icons.copy_outlined, size: 18),
+          child: Text(strings.duplicate),
+        ),
+        const Divider(height: 1),
+        MenuItemButton(
+          onPressed: () => act('delete'),
+          leadingIcon: Icon(
+            Icons.delete_outline,
+            size: 18,
+            color: Theme.of(context).colorScheme.error,
+          ),
+          style: MenuItemButton.styleFrom(
+            foregroundColor: Theme.of(context).colorScheme.error,
+          ),
+          child: Text(strings.delete),
+        ),
       ],
+      builder: (context, menuCtrl, _) => IconButton(
+        icon: Icon(Icons.more_vert, size: dense ? 18 : 24),
+        padding: EdgeInsets.zero,
+        visualDensity: VisualDensity.compact,
+        tooltip: 'Options',
+        onPressed: () {
+          if (menuCtrl.isOpen) {
+            menuCtrl.close();
+          } else {
+            menuCtrl.open();
+          }
+        },
+      ),
     );
   }
 }
@@ -1283,6 +1335,9 @@ IconData _iconFor(EntryKind kind) {
     case EntryKind.video:
       return Icons.videocam_outlined;
 
+    case EntryKind.table:
+      return Icons.table_chart_outlined;
+
     case EntryKind.other:
       return Icons.insert_drive_file_outlined;
   }
@@ -1351,7 +1406,7 @@ Future<List<String>?> _promptTags(
           onPressed: () {
             final tags = controller.text
                 .split(',')
-                .map((t) => t.trim())
+                .map((t) => t.trim().replaceFirst(RegExp(r'^#+'), '').trim())
                 .where((t) => t.isNotEmpty)
                 .toList();
 

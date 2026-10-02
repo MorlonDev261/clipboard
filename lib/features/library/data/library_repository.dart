@@ -1,9 +1,12 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
 
+import 'file_names.dart';
 import '../domain/library_entry.dart';
+import '../domain/table_document.dart';
 import 'metadata_store.dart';
 import 'trash_store.dart';
 
@@ -21,6 +24,7 @@ class LibraryRepository {
   final String root;
   final MetadataStore _metadata;
   final TrashStore _trash;
+  final _fileKindCache = <String, _FileKindCacheEntry>{};
   static const _uuid = Uuid();
 
   // --- Listing ---------------------------------------------------------------
@@ -55,10 +59,12 @@ class LibraryRepository {
           tags: m?.tags ?? const [],
         ));
       } else if (ent is File) {
+        final kind = await _kindForFile(ent.path, stat);
+        if (_isRejectedStructuredFile(ent.path, kind)) continue;
         entries.add(LibraryEntry(
           path: ent.path,
           name: name,
-          kind: kindForFile(name),
+          kind: kind,
           size: stat.size,
           modified: stat.modified,
           isFavorite: m?.favorite ?? false,
@@ -137,10 +143,12 @@ class LibraryRepository {
         ));
         await _walk(ent, meta, out, includeAttachments: includeAttachments);
       } else if (ent is File) {
+        final kind = await _kindForFile(ent.path, stat);
+        if (_isRejectedStructuredFile(ent.path, kind)) continue;
         out.add(LibraryEntry(
           path: ent.path,
           name: name,
-          kind: kindForFile(name),
+          kind: kind,
           size: stat.size,
           modified: stat.modified,
           isFavorite: m?.favorite ?? false,
@@ -168,13 +176,14 @@ class LibraryRepository {
     required String content,
   }) async {
     final base = _sanitize(title.trim().isEmpty ? 'Note' : title.trim());
-    var file = File(p.join(dirPath, '$base.md'));
-    var i = 1;
-    while (await file.exists()) {
-      file = File(p.join(dirPath, '$base ($i).md'));
-      i++;
+    final path = await _claimFile(p.join(dirPath, '$base.md'));
+    final file = File(path);
+    try {
+      await file.writeAsString(content, encoding: utf8);
+    } catch (_) {
+      await _dropClaim(path);
+      rethrow;
     }
-    await file.writeAsString(content);
     return file.path;
   }
 
@@ -185,15 +194,22 @@ class LibraryRepository {
   Future<String> attachImageToDir(String dirPath, String sourcePath) async {
     final attachDir = Directory(p.join(dirPath, '.attachments'));
     await attachDir.create(recursive: true);
-    final target = _uniquePath(p.join(attachDir.path, p.basename(sourcePath)));
-    await File(sourcePath).copy(target);
+    final target =
+        await _claimFile(p.join(attachDir.path, p.basename(sourcePath)));
+    try {
+      await _copyInto(sourcePath, target);
+    } catch (_) {
+      await _dropClaim(target);
+      rethrow;
+    }
     return target;
   }
 
-  Future<String> readTextFile(String path) => File(path).readAsString();
+  Future<String> readTextFile(String path) =>
+      File(path).readAsString(encoding: utf8);
 
   Future<void> writeTextFile(String path, String content) =>
-      File(path).writeAsString(content);
+      File(path).writeAsString(content, encoding: utf8);
 
   // --- Rename ----------------------------------------------------------------
 
@@ -228,14 +244,33 @@ class LibraryRepository {
   Future<void> setTags(String path, List<String> tags) =>
       _metadata.setTags(path, tags);
 
+  Future<EntryMeta> getMeta(String path) => _metadata.get(path);
+
+  Future<void> setNoteSeparator(String path, String? separator) =>
+      _metadata.setNoteSeparator(path, separator);
+
   // --- Move / duplicate ------------------------------------------------------
 
   Future<String> move(String path, String destDir) async {
-    final target = _uniquePath(p.join(destDir, p.basename(path)));
+    if (p.equals(path, destDir) || p.isWithin(path, destDir)) {
+      throw const FileSystemException(
+          'Impossible de déplacer un dossier dans lui-même.');
+    }
     final isDir = await FileSystemEntity.isDirectory(path);
-    final result = isDir
-        ? await Directory(path).rename(target)
-        : await File(path).rename(target);
+    // Files: claim the name first, so a concurrent create can never be
+    // replaced by this rename.
+    final target = isDir
+        ? _uniquePath(p.join(destDir, p.basename(path)))
+        : await _claimFile(p.join(destDir, p.basename(path)));
+    final FileSystemEntity result;
+    try {
+      result = isDir
+          ? await Directory(path).rename(target)
+          : await File(path).rename(target);
+    } catch (_) {
+      if (!isDir) await _dropClaim(target);
+      rethrow;
+    }
     await _metadata.move(path, result.path);
     return result.path;
   }
@@ -250,8 +285,13 @@ class LibraryRepository {
     }
     final base = p.basenameWithoutExtension(path);
     final ext = p.extension(path);
-    final target = _uniquePath(p.join(parent, '$base (copie)$ext'));
-    await File(path).copy(target);
+    final target = await _claimFile(p.join(parent, '$base (copie)$ext'));
+    try {
+      await _copyInto(path, target);
+    } catch (_) {
+      await _dropClaim(target);
+      rethrow;
+    }
     return target;
   }
 
@@ -265,14 +305,30 @@ class LibraryRepository {
     final failed = <String>[];
     for (final src in sourcePaths) {
       try {
+        // A folder cannot go into itself or one of its own sub-folders: the
+        // copy would nest into itself and, in "move" mode, deleting the source
+        // would delete the copy too (everything lost).
+        if (p.equals(src, destDir) || p.isWithin(src, destDir)) {
+          failed.add(src);
+          continue;
+        }
         final type = await FileSystemEntity.type(src);
         switch (type) {
           case FileSystemEntityType.directory:
-            await _copyDirectory(src, p.join(destDir, p.basename(src)));
-            if (move) await Directory(src).delete(recursive: true);
+            final copied =
+                await _copyDirectory(src, p.join(destDir, p.basename(src)));
+            if (copied) {
+              if (move) await Directory(src).delete(recursive: true);
+            } else {
+              failed.add(src);
+            }
           case FileSystemEntityType.file:
-            await _copyFileInto(destDir, src);
-            if (move) await File(src).delete();
+            final copied = await _copyFileInto(destDir, src);
+            if (copied) {
+              if (move) await File(src).delete();
+            } else {
+              failed.add(src);
+            }
           default:
             // Missing, a link, or otherwise not something we can copy.
             failed.add(src);
@@ -284,23 +340,50 @@ class LibraryRepository {
     return failed;
   }
 
-  Future<void> _copyFileInto(String destDir, String srcPath) async {
-    final name = p.basename(srcPath);
-    final target = _uniquePath(p.join(destDir, name));
-    await File(srcPath).copy(target);
+  Future<bool> _copyFileInto(String destDir, String srcPath) async {
+    return _copyAcceptedFileInto(destDir, srcPath);
   }
 
-  Future<void> _copyDirectory(String srcDir, String destDir) async {
+  Future<bool> _copyAcceptedFileInto(String destDir, String srcPath) async {
+    if (!await isAcceptedImportFile(srcPath)) return false;
+    await Directory(destDir).create(recursive: true);
+    final ext = p.extension(srcPath).toLowerCase();
+    final sourceName = p.basename(srcPath);
+    final targetName = ext == '.txt'
+        ? '${p.basenameWithoutExtension(sourceName)}.md'
+        : sourceName;
+    final target = await _claimFile(p.join(destDir, targetName));
+    try {
+      if (ext == '.txt') {
+        await File(target).writeAsString(
+          await File(srcPath).readAsString(encoding: utf8),
+          encoding: utf8,
+        );
+      } else {
+        await _copyInto(srcPath, target);
+      }
+    } catch (_) {
+      await _dropClaim(target);
+      rethrow;
+    }
+    return true;
+  }
+
+  Future<bool> _copyDirectory(String srcDir, String destDir) async {
     final target = _uniquePath(destDir);
-    await Directory(target).create(recursive: true);
+    var copiedAny = false;
     await for (final ent in Directory(srcDir).list(followLinks: false)) {
       final name = p.basename(ent.path);
       if (ent is Directory) {
-        await _copyDirectory(ent.path, p.join(target, name));
+        final copied = await _copyDirectory(ent.path, p.join(target, name));
+        copiedAny = copiedAny || copied;
       } else if (ent is File) {
-        await ent.copy(p.join(target, name));
+        if (await _copyAcceptedFileInto(target, ent.path)) {
+          copiedAny = true;
+        }
       }
     }
+    return copiedAny;
   }
 
   // --- Trash -----------------------------------------------------------------
@@ -332,16 +415,25 @@ class LibraryRepository {
     final entry = await _trash.find(id);
     if (entry == null) return;
     // Restore to the original location, or to the workspace root if the
-    // original parent no longer exists.
+    // original parent no longer exists — or lies outside the workspace (the
+    // index is untrusted: a crafted one must not move files elsewhere).
     var target = entry.originalPath;
-    if (!await Directory(p.dirname(target)).exists()) {
-      target = p.join(root, entry.name);
+    final inside = p.isWithin(root, target) && !_hasDotDot(target);
+    if (!inside || !await Directory(p.dirname(target)).exists()) {
+      target = p.join(root, p.basename(entry.name));
     }
-    target = _uniquePath(target);
+    final source = _trash.resolve(entry);
     if (entry.isDir) {
-      await Directory(entry.trashedPath).rename(target);
+      target = _uniquePath(target);
+      await Directory(source).rename(target);
     } else {
-      await File(entry.trashedPath).rename(target);
+      target = await _claimFile(target);
+      try {
+        await File(source).rename(target);
+      } catch (_) {
+        await _dropClaim(target);
+        rethrow;
+      }
     }
     await _trash.remove(id);
   }
@@ -349,11 +441,14 @@ class LibraryRepository {
   Future<void> deleteForever(String id) async {
     final entry = await _trash.find(id);
     if (entry == null) return;
-    final type = await FileSystemEntity.type(entry.trashedPath);
+    // Only ever delete inside the trash folder, whatever the index says.
+    final source = _trash.resolve(entry);
+    final type = await FileSystemEntity.type(source, followLinks: false);
     if (type == FileSystemEntityType.directory) {
-      await Directory(entry.trashedPath).delete(recursive: true);
-    } else if (type == FileSystemEntityType.file) {
-      await File(entry.trashedPath).delete();
+      await Directory(source).delete(recursive: true);
+    } else if (type == FileSystemEntityType.file ||
+        type == FileSystemEntityType.link) {
+      await File(source).delete();
     }
     await _trash.remove(id);
   }
@@ -365,6 +460,99 @@ class LibraryRepository {
   }
 
   // --- Helpers ---------------------------------------------------------------
+
+  Future<EntryKind> _kindForFile(String path, [FileStat? knownStat]) async {
+    final ext = p.extension(path).toLowerCase();
+    if (!tableExtensions.contains(ext)) return kindForFile(path);
+
+    FileStat stat;
+    try {
+      stat = knownStat ?? await File(path).stat();
+    } catch (_) {
+      return EntryKind.other;
+    }
+
+    final cached = _fileKindCache[path];
+    if (cached != null &&
+        cached.modified == stat.modified &&
+        cached.size == stat.size) {
+      return cached.kind;
+    }
+
+    final kind =
+        await isCompatibleTableJson(path) ? EntryKind.table : EntryKind.other;
+    _fileKindCache[path] = _FileKindCacheEntry(
+      modified: stat.modified,
+      size: stat.size,
+      kind: kind,
+    );
+    return kind;
+  }
+
+  bool _isRejectedStructuredFile(String path, EntryKind kind) {
+    return tableExtensions.contains(p.extension(path).toLowerCase()) &&
+        kind == EntryKind.other;
+  }
+
+  /// Atomically reserves a free file name (`create(exclusive: true)` fails if
+  /// the name is taken) and returns it: unlike "test then write", two
+  /// simultaneous imports can never end up on the same path and overwrite each
+  /// other. Falls back to `name (1).ext`, `name (2).ext`…
+  Future<String> _claimFile(String path) async {
+    final dir = p.dirname(path);
+    final ext = p.extension(path);
+    final base = p.basenameWithoutExtension(path);
+    var candidate = path;
+    // A permanent failure (read-only folder, disk full…) must surface instead
+    // of spinning through names forever.
+    const maxAttempts = 2000;
+    for (var i = 1; i <= maxAttempts; i++) {
+      try {
+        await File(candidate).create(exclusive: true, recursive: true);
+        return candidate;
+      } on FileSystemException catch (e) {
+        // Do not rely on an existence check: on Windows it fails with a sharing
+        // violation while another task is writing to the very file that blocked
+        // us. The OS error code is the reliable signal.
+        final code = e.osError?.errorCode;
+        final taken = e is PathExistsException ||
+            code == 80 || // ERROR_FILE_EXISTS (Windows)
+            code == 183 || // ERROR_ALREADY_EXISTS (Windows)
+            code == 32 || // ERROR_SHARING_VIOLATION: busy, so it exists
+            code == 33 || // ERROR_LOCK_VIOLATION
+            code == 17 || // EEXIST (POSIX)
+            _exists(candidate);
+        if (!taken || i == maxAttempts) rethrow;
+      }
+      candidate = p.join(dir, '$base ($i)$ext');
+    }
+    throw FileSystemException('Aucun nom libre trouvé', path);
+  }
+
+  /// Copies [from] into the file reserved by [_claimFile] by *writing into it*.
+  /// `File.copy` cannot be used here: on Windows it first deletes an existing
+  /// target, and in that gap another task can reserve the same name — the copy
+  /// then fails (or two files end up fighting for one name).
+  Future<void> _copyInto(String from, String claimed) async {
+    final sink = File(claimed).openWrite();
+    try {
+      await sink.addStream(File(from).openRead());
+    } finally {
+      await sink.close();
+    }
+  }
+
+  /// Removes the empty placeholder left by [_claimFile] when the write failed.
+  Future<void> _dropClaim(String path) async {
+    try {
+      final f = File(path);
+      if (await f.exists() && await f.length() == 0) await f.delete();
+    } catch (_) {
+      // best effort
+    }
+  }
+
+  bool _hasDotDot(String path) => p.split(path).contains('..');
 
   bool _exists(String path) =>
       File(path).existsSync() || Directory(path).existsSync();
@@ -384,8 +572,17 @@ class LibraryRepository {
     }
   }
 
-  String _sanitize(String name) {
-    final cleaned = name.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_').trim();
-    return cleaned.isEmpty ? 'Sans titre' : cleaned;
-  }
+  String _sanitize(String name) => sanitizeFileName(name);
+}
+
+class _FileKindCacheEntry {
+  const _FileKindCacheEntry({
+    required this.modified,
+    required this.size,
+    required this.kind,
+  });
+
+  final DateTime modified;
+  final int size;
+  final EntryKind kind;
 }

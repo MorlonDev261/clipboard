@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/l10n/app_strings.dart';
+import '../../features/reseller/application/reseller_providers.dart';
+import '../../shared/enums/enums.dart';
 import '../constants/app_constants.dart';
 
 /// Top-level responsive navigation shell.
@@ -11,7 +14,8 @@ import '../constants/app_constants.dart';
 ///   assistant as a larger, centered button.
 /// * Desktop / tablet: persistent [NavigationRail] sidebar.
 ///
-/// Search is not a tab: it is reached from the header (see BrowseScreen).
+/// Search is reached from page headers, so it can be pushed onto the current
+/// navigation history without becoming a top-level tab.
 class AppShell extends ConsumerWidget {
   const AppShell({
     required this.location,
@@ -36,9 +40,13 @@ class AppShell extends ConsumerWidget {
   int get _selectedIndex {
     // Browse / note / preview / search routes belong to the "home" tab.
     if (location.startsWith('/favorites')) return 1;
-    if (location.startsWith('/assistant')) return 2;
+    if (location.startsWith('/assistant') || location.startsWith('/deganeo')) {
+      return 2;
+    }
     if (location.startsWith('/trash')) return 3;
-    if (location.startsWith('/settings')) return 4;
+    if (location.startsWith('/settings') || location.startsWith('/about')) {
+      return 4;
+    }
     return 0;
   }
 
@@ -46,8 +54,26 @@ class AppShell extends ConsumerWidget {
     context.go(_destinations[index].route);
   }
 
+  void _handleSystemBack(BuildContext context) {
+    final navigator = Navigator.of(context);
+    if (navigator.canPop()) {
+      navigator.pop();
+      return;
+    }
+    if (location != '/') {
+      context.go('/');
+      return;
+    }
+    SystemNavigator.pop();
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // In "reseller" mode the home tab IS the reseller space, full screen: it
+    // brings its own header, badge and back handling.
+    if (location == '/' && ref.watch(appModeProvider) == AppMode.reseller) {
+      return child;
+    }
     final strings = ref.watch(appStringsProvider);
     final labels = [
       strings.home,
@@ -60,45 +86,57 @@ class AppShell extends ConsumerWidget {
         MediaQuery.sizeOf(context).width >= AppConstants.desktopBreakpoint;
 
     if (isDesktop) {
-      return Scaffold(
-        body: Row(
-          children: [
-            NavigationRail(
-              selectedIndex: _selectedIndex,
-              onDestinationSelected: (i) => _onSelect(context, i),
-              labelType: NavigationRailLabelType.all,
-              leading: const Padding(
-                padding: EdgeInsets.symmetric(vertical: 12),
-                child: Image(
-                  image: AssetImage('assets/icon/icon.png'),
-                  width: 36,
-                  height: 36,
-                ),
-              ),
-              destinations: [
-                for (var i = 0; i < _destinations.length; i++)
-                  NavigationRailDestination(
-                    icon: Icon(_destinations[i].icon),
-                    selectedIcon: Icon(_destinations[i].selectedIcon),
-                    label: Text(labels[i]),
+      return PopScope<Object?>(
+        canPop: false,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) _handleSystemBack(context);
+        },
+        child: Scaffold(
+          body: Row(
+            children: [
+              NavigationRail(
+                selectedIndex: _selectedIndex,
+                onDestinationSelected: (i) => _onSelect(context, i),
+                labelType: NavigationRailLabelType.all,
+                leading: const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Image(
+                    image: AssetImage('assets/icon/icon.png'),
+                    width: 36,
+                    height: 36,
                   ),
-              ],
-            ),
-            const VerticalDivider(width: 1),
-            Expanded(child: child),
-          ],
+                ),
+                destinations: [
+                  for (var i = 0; i < _destinations.length; i++)
+                    NavigationRailDestination(
+                      icon: Icon(_destinations[i].icon),
+                      selectedIcon: Icon(_destinations[i].selectedIcon),
+                      label: Text(labels[i]),
+                    ),
+                ],
+              ),
+              const VerticalDivider(width: 1),
+              Expanded(child: child),
+            ],
+          ),
         ),
       );
     }
 
-    return Scaffold(
-      body: child,
-      bottomNavigationBar: _BottomBar(
-        selectedIndex: _selectedIndex,
-        labels: labels,
-        destinations: _destinations,
-        centerIndex: _centerIndex,
-        onSelect: (i) => _onSelect(context, i),
+    return PopScope<Object?>(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _handleSystemBack(context);
+      },
+      child: Scaffold(
+        body: child,
+        bottomNavigationBar: _BottomBar(
+          selectedIndex: _selectedIndex,
+          labels: labels,
+          destinations: _destinations,
+          centerIndex: _centerIndex,
+          onSelect: (i) => _onSelect(context, i),
+        ),
       ),
     );
   }

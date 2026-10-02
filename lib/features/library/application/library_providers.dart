@@ -10,6 +10,7 @@ import '../data/library_repository.dart';
 import '../data/metadata_store.dart';
 import '../data/trash_store.dart';
 import '../domain/library_entry.dart';
+import '../domain/table_document.dart';
 
 /// Active sort order in the browser (session state).
 final browseSortProvider =
@@ -17,6 +18,9 @@ final browseSortProvider =
 
 /// Active kind filter in the browser; null means "all" (session state).
 final browseFilterProvider = StateProvider<EntryKind?>((ref) => null);
+
+/// Paths currently selected in the browser and preview screen (session state).
+final selectedEntriesProvider = StateProvider<Set<String>>((ref) => <String>{});
 
 /// The filesystem repository bound to the current workspace, or null if no
 /// workspace has been chosen yet.
@@ -33,14 +37,25 @@ final libraryRepositoryProvider = Provider<LibraryRepository?>((ref) {
 /// Live listing of a directory. Re-scans on any filesystem change in that
 /// directory, so files dropped in (from the app or from the OS) appear
 /// automatically.
-final directoryProvider = StreamProvider.autoDispose
-    .family<List<LibraryEntry>, String>((ref, dirPath) async* {
+final directoryProvider =
+    StreamProvider.family<List<LibraryEntry>, String>((ref, dirPath) async* {
   final repo = ref.watch(libraryRepositoryProvider);
   if (repo == null) {
     yield const [];
     return;
   }
   yield await repo.listEntries(dirPath);
+
+  // Android/iOS filesystem watching can assert inside dart:io for app/private
+  // and external-storage paths. Poll lightly there; app-driven mutations still
+  // invalidate this provider immediately through LibraryController.
+  if (Platform.isAndroid || Platform.isIOS) {
+    while (true) {
+      await Future<void>.delayed(const Duration(seconds: 2));
+      yield await repo.listEntries(dirPath);
+    }
+  }
+
   try {
     // Recursive: a change deep in a sub-folder also re-emits, so the recursive
     // folder stats (which count sub-folders) stay in sync. Best-effort — some
@@ -66,13 +81,17 @@ final directoryProvider = StreamProvider.autoDispose
 /// `.attachments` folders). Used by the browser's kind filters so a filter
 /// reveals matching items nested deep in sub-folders, consistent with the
 /// recursive stat cards.
-final dirRecursiveProvider = FutureProvider.autoDispose
-    .family<List<LibraryEntry>, String>((ref, dirPath) async {
+final dirRecursiveProvider =
+    FutureProvider.family<List<LibraryEntry>, String>((ref, dirPath) async {
   final repo = ref.watch(libraryRepositoryProvider);
   if (repo == null) return const [];
-  // Re-run whenever this folder's live (recursive) listing changes, so items
-  // added/removed deep in a sub-folder appear/disappear automatically.
-  ref.watch(directoryProvider(dirPath));
+  // Re-run whenever this folder's live listing changes. On mobile the live
+  // listing uses a light polling fallback, which would make filtered views
+  // flash/reload every couple of seconds; app-driven mutations explicitly
+  // invalidate this provider instead.
+  if (!Platform.isAndroid && !Platform.isIOS) {
+    ref.watch(directoryProvider(dirPath));
+  }
   return repo.listAllUnder(dirPath, includeAttachments: true);
 });
 
@@ -98,7 +117,13 @@ final favoritesProvider = FutureProvider<List<LibraryEntry>>((ref) async {
 });
 
 /// Recursive counts for a folder (the folder itself + all sub-folders).
-typedef DirStats = ({int folders, int images, int videos, int notes});
+typedef DirStats = ({
+  int folders,
+  int images,
+  int videos,
+  int notes,
+  int tables,
+});
 
 final dirStatsProvider =
     FutureProvider.autoDispose.family<DirStats, String>((ref, dirPath) async {
@@ -111,7 +136,14 @@ final dirStatsProvider =
     images: all.where((e) => e.isImage).length,
     videos: all.where((e) => e.isVideo).length,
     notes: all.where((e) => e.isNote).length,
+    tables: all.where((e) => e.isTable).length,
   );
+});
+
+final tableDocumentProvider = FutureProvider.autoDispose
+    .family<TableDocument?, String>((ref, path) async {
+  ref.watch(directoryProvider(p.dirname(path)));
+  return TableDocument.read(path);
 });
 
 /// Controller for library mutations. Callers pass the directory that should be
@@ -172,6 +204,13 @@ class LibraryController {
   Future<void> saveNote(String path, String content) =>
       _repo.writeTextFile(path, content);
 
+  Future<void> saveTable(String path, TableDocument table) async {
+    await _repo.writeTextFile(path, table.toPrettyJson());
+    _ref.invalidate(tableDocumentProvider(path));
+    _ref.invalidate(directoryProvider(p.dirname(path)));
+    _touchIndex();
+  }
+
   Future<String> rename(String path, String newName,
       {String? parentDir}) async {
     final result = await _repo.rename(path, newName);
@@ -189,6 +228,16 @@ class LibraryController {
   Future<void> setTags(String path, List<String> tags,
       {String? parentDir}) async {
     await _repo.setTags(path, tags);
+    if (parentDir != null) _ref.invalidate(directoryProvider(parentDir));
+    _touchIndex();
+  }
+
+  Future<String?> noteSeparator(String path) async =>
+      (await _repo.getMeta(path)).noteSeparator;
+
+  Future<void> setNoteSeparator(String path, String? separator,
+      {String? parentDir}) async {
+    await _repo.setNoteSeparator(path, separator);
     if (parentDir != null) _ref.invalidate(directoryProvider(parentDir));
     _touchIndex();
   }

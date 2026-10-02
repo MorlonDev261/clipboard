@@ -59,12 +59,26 @@ class TrashScreen extends ConsumerWidget {
                       IconButton(
                         tooltip: strings.restore,
                         icon: const Icon(Icons.restore),
-                        onPressed: () => controller.restoreFromTrash(item.id),
+                        onPressed: () async {
+                          try {
+                            await controller.restoreFromTrash(item.id);
+                          } catch (_) {
+                            if (!context.mounted) return;
+                            _snack(context, strings.genericError);
+                          }
+                        },
                       ),
                       IconButton(
                         tooltip: strings.deletePermanently,
                         icon: const Icon(Icons.delete_forever),
-                        onPressed: () => controller.deleteForever(item.id),
+                        onPressed: () async {
+                          try {
+                            await controller.deleteForever(item.id);
+                          } catch (_) {
+                            if (!context.mounted) return;
+                            _snack(context, strings.genericError);
+                          }
+                        },
                       ),
                     ],
                   ),
@@ -97,7 +111,18 @@ class TrashScreen extends ConsumerWidget {
       ),
     );
     if (ok == true) {
-      await ref.read(libraryControllerProvider).emptyTrash();
+      try {
+        await ref.read(libraryControllerProvider).emptyTrash();
+      } catch (_) {
+        if (!context.mounted) return;
+        _snack(context, strings.genericError);
+      }
     }
+  }
+
+  void _snack(BuildContext context, String message) {
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 }

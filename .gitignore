@@ -72,3 +72,16 @@ app.*.map.json
 # Local secrets
 *.env
 .env*
+
+# Local release artifacts collected by tools/collect_release_artifacts.ps1
+/dist/latest/**
+/dist/releases/**
+!/dist/README.md
+!/dist/.gitkeep
+
+# Local scratch (screenshots, logs, backups) and compiler output
+/tmp/
+*.obj
+
+# Firebase client config: downloaded per developer from the console
+**/android/app/google-services.json

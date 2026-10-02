@@ -12,6 +12,9 @@ String newNoteRoute(String dir) =>
 String previewRoute(String path) =>
     Uri(path: '/preview', queryParameters: {'path': path}).toString();
 
+String tableRoute(String path) =>
+    Uri(path: '/table', queryParameters: {'path': path}).toString();
+
 /// Search route, optionally pre-filled with an initial [query].
 String searchRoute([String? query]) => (query == null || query.isEmpty)
     ? '/search'

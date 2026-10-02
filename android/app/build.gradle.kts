@@ -1,7 +1,23 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+}
+
+// Push notifications (Firebase project "poma-original", same as the web app).
+// google-services.json comes from the Firebase console (Android app
+// com.influencor.app) and is not committed. Without it the app still builds and
+// runs; push is simply disabled.
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
 }
 
 android {
@@ -28,11 +44,51 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        create("release") {
+            if (keystorePropertiesFile.exists()) {
+                keyAlias = keystoreProperties["keyAlias"] as String
+                keyPassword = keystoreProperties["keyPassword"] as String
+                storeFile = rootProject.file(keystoreProperties["storeFile"] as String)
+                storePassword = keystoreProperties["storePassword"] as String
+            }
+        }
+    }
+
+    // A release signed with the debug key has a different certificate than the
+    // one declared in assetlinks.json (App Links would silently stop being
+    // verified), so a release build without key.properties fails loudly.
+    // ALLOW_DEBUG_SIGNING=1 keeps `flutter run --release` usable locally.
+    val releaseRequested = gradle.startParameter.taskNames.any {
+        it.contains("release", ignoreCase = true)
+    }
+    if (releaseRequested &&
+        !keystorePropertiesFile.exists() &&
+        System.getenv("ALLOW_DEBUG_SIGNING") != "1"
+    ) {
+        throw GradleException(
+            "android/key.properties is missing: refusing to sign a release with the " +
+                "debug key (App Links would not verify). Create it, or set " +
+                "ALLOW_DEBUG_SIGNING=1 for a local-only build."
+        )
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (keystorePropertiesFile.exists()) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
+        }
+    }
+
+    packaging {
+        jniLibs {
+            // Native plugins are built locally by cargokit. On this Windows SDK
+            // setup, app bundle generation can fail while stripping their
+            // symbols even though the binaries are otherwise valid.
+            keepDebugSymbols += listOf("**/*.so")
         }
     }
 }

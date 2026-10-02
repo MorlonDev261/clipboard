@@ -3,45 +3,54 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/widgets/app_header_title.dart';
 import '../../../core/l10n/app_strings.dart';
-import '../../../core/picker/app_file_picker.dart';
-import '../../../core/picker/pick_mode.dart';
+import '../../../core/picker/pick_workspace.dart';
 import '../../../core/providers/workspace_providers.dart';
+import '../../../shared/enums/enums.dart';
 import '../../library/presentation/browse_screen.dart';
+import '../../reseller/application/reseller_providers.dart';
+import '../../reseller/presentation/reseller_home.dart';
 
 /// Home tab: shows the working folder directly (its contents + the Add button)
 /// once a workspace is chosen, or the workspace picker otherwise.
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
-  Future<void> _pickWorkspace(BuildContext context, WidgetRef ref) async {
-    final strings = ref.read(appStringsProvider);
-    final dirs = await AppFilePicker.pick(
-      context,
-      mode: PickMode.directory,
-      title: strings.chooseWorkspace,
-    );
-    if (dirs.isNotEmpty) {
-      await ref.read(workspaceControllerProvider.notifier).setRoot(dirs.first);
-    }
-  }
+  Future<void> _pickWorkspace(BuildContext context, WidgetRef ref) =>
+      pickWorkspaceWithFeedback(context, ref,
+          title: ref.read(appStringsProvider).chooseWorkspace);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final strings = ref.watch(appStringsProvider);
     final workspace = ref.watch(workspaceControllerProvider);
 
+    // "reseller" mode: the whole home is the reseller space.
+    if (ref.watch(appModeProvider) == AppMode.reseller) {
+      return const ResellerHome();
+    }
+
     return workspace.when(
       loading: () => const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       ),
       error: (e, _) => Scaffold(
-        appBar: AppBar(title: const AppHeaderTitle()),
+        appBar: AppBar(
+          toolbarHeight: ref.watch(modeBadgeVisibleProvider)
+              ? AppHeaderTitle.heightWithBadge
+              : null,
+          title: const AppHeaderTitle(showModeBadge: true),
+        ),
         body: Center(child: Text(strings.genericError)),
       ),
       data: (root) {
         if (root == null) {
           return Scaffold(
-            appBar: AppBar(title: const AppHeaderTitle()),
+            appBar: AppBar(
+              toolbarHeight: ref.watch(modeBadgeVisibleProvider)
+                  ? AppHeaderTitle.heightWithBadge
+                  : null,
+              title: const AppHeaderTitle(showModeBadge: true),
+            ),
             body: _ChooseWorkspace(onPick: () => _pickWorkspace(context, ref)),
           );
         }

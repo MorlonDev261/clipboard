@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/constants/app_constants.dart';
 import '../../../../core/l10n/app_strings.dart';
+import '../../domain/library_entry.dart';
 
 /// A messenger-style preview: shows the note as an outgoing chat message so the
 /// user sees how the formatted note reads once shared. Read-only.
@@ -73,7 +74,7 @@ class ChatPreviewDialog extends ConsumerWidget {
                   padding: const EdgeInsets.all(12),
                   children: [
                     for (final path in imagePaths)
-                      _OutgoingImageBubble(path: path, scheme: scheme),
+                      _OutgoingMediaBubble(path: path, scheme: scheme),
                     if (hasText)
                       _OutgoingTextBubble(markdown: markdown, scheme: scheme),
                     const SizedBox(height: 4),
@@ -144,14 +145,15 @@ class _OutgoingTextBubble extends StatelessWidget {
   }
 }
 
-class _OutgoingImageBubble extends StatelessWidget {
-  const _OutgoingImageBubble({required this.path, required this.scheme});
+class _OutgoingMediaBubble extends StatelessWidget {
+  const _OutgoingMediaBubble({required this.path, required this.scheme});
 
   final String path;
   final ColorScheme scheme;
 
   @override
   Widget build(BuildContext context) {
+    final isVideo = kindForFile(path) == EntryKind.video;
     return Align(
       alignment: Alignment.centerRight,
       child: Container(
@@ -159,17 +161,25 @@ class _OutgoingImageBubble extends StatelessWidget {
         constraints: const BoxConstraints(maxWidth: 240, maxHeight: 240),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),
-          child: Image.file(
-            File(path),
-            fit: BoxFit.cover,
-            cacheWidth: 500,
-            errorBuilder: (_, __, ___) => Container(
-              width: 120,
-              height: 120,
-              color: scheme.surfaceContainerHighest,
-              child: const Icon(Icons.broken_image_outlined),
-            ),
-          ),
+          child: isVideo
+              ? Container(
+                  width: 180,
+                  height: 120,
+                  color: scheme.surfaceContainerHighest,
+                  child: Icon(Icons.videocam_outlined, color: scheme.primary),
+                )
+              : Image.file(
+                  File(path),
+                  fit: BoxFit.cover,
+                  gaplessPlayback: true,
+                  cacheWidth: 500,
+                  errorBuilder: (_, __, ___) => Container(
+                    width: 120,
+                    height: 120,
+                    color: scheme.surfaceContainerHighest,
+                    child: const Icon(Icons.broken_image_outlined),
+                  ),
+                ),
         ),
       ),
     );

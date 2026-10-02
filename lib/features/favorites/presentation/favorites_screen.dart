@@ -19,6 +19,8 @@ class FavoritesScreen extends ConsumerWidget {
       context.push(browseRoute(e.path));
     } else if (e.isNote) {
       context.push(noteRoute(e.path));
+    } else if (e.isTable) {
+      context.push(tableRoute(e.path));
     } else {
       context.push(previewRoute(e.path));
     }
@@ -59,8 +61,18 @@ class FavoritesScreen extends ConsumerWidget {
                 trailing: IconButton(
                   tooltip: strings.removeFromFavorites,
                   icon: const Icon(Icons.star),
-                  onPressed: () => controller.setFavorite(e.path, false,
-                      parentDir: p.dirname(e.path)),
+                  onPressed: () async {
+                    try {
+                      await controller.setFavorite(e.path, false,
+                          parentDir: p.dirname(e.path));
+                    } catch (_) {
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context)
+                        ..clearSnackBars()
+                        ..showSnackBar(
+                            SnackBar(content: Text(strings.genericError)));
+                    }
+                  },
                 ),
                 onTap: () => _open(context, e),
               );
@@ -82,6 +94,8 @@ IconData _iconFor(EntryKind kind) {
       return Icons.image_outlined;
     case EntryKind.video:
       return Icons.videocam_outlined;
+    case EntryKind.table:
+      return Icons.table_chart_outlined;
     case EntryKind.other:
       return Icons.insert_drive_file_outlined;
   }

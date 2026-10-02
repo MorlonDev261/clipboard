@@ -1,7 +1,7 @@
 name: clipboard
 description: "Clipboard — a personal content library for social media managers and creators."
 publish_to: "none"
-version: 0.1.0+1
+version: 0.1.2+4003
 
 environment:
   sdk: ">=3.5.0 <4.0.0"
@@ -38,6 +38,7 @@ dependencies:
   # Pinned to 12.x: share_plus 13+ requires win32 ^6, which conflicts with
   # super_clipboard/super_native_extensions (win32 <6).
   share_plus: ^12.0.0
+  url_launcher: ^6.3.1
   # Clipboard image support (Flutter's native clipboard is text-only)
   pasteboard: ^0.4.0
 
@@ -55,6 +56,11 @@ dependencies:
   media_kit: ^1.2.6
   media_kit_video: ^2.0.1
   media_kit_libs_video: ^1.0.7
+  flutter_svg: ^2.0.17
+  webview_flutter: ^4.14.1
+  app_links: ^7.2.1
+  firebase_core: ^4.15.0
+  firebase_messaging: ^16.7.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -66,6 +72,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/icon/icon.png
+    - assets/deganeo/logo-Deganeo.svg
 
 # App launcher icons (run: dart run flutter_launcher_icons)
 flutter_launcher_icons:

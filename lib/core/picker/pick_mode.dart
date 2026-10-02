@@ -6,6 +6,9 @@ enum PickMode {
   /// Image files only (multi-select when allowed).
   imageFiles,
 
+  /// Image and video files only (multi-select when allowed).
+  mediaFiles,
+
   /// A single directory.
   directory,
 }

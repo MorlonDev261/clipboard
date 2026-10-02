@@ -1,6 +1,9 @@
 /// App-wide constants and configurable defaults.
 abstract final class AppConstants {
-  static const String appName = 'influencor';
+  static const String appName = 'Influencor';
+
+  /// Keep in sync with `version:` in pubspec.yaml (without the build number).
+  static const String version = '0.1.2';
 
   /// Layout breakpoint (logical pixels) above which the desktop / tablet
   /// layout (persistent sidebar, wider grids) is used.
@@ -34,5 +37,12 @@ abstract final class AppConstants {
   /// (U+0336); Cambria Math supplies the bold/italic math letters (and also
   /// centres the strike); Segoe UI is the last-resort fallback.
   static const String noteFontFamily = 'Arial';
-  static const List<String> noteFontFallback = ['Cambria Math', 'Segoe UI'];
+  static const List<String> noteFontFallback = [
+    'Cambria Math',
+    'Segoe UI',
+    'Segoe UI Symbol',
+    'Segoe UI Emoji',
+    'Noto Sans',
+    'Noto Color Emoji',
+  ];
 }

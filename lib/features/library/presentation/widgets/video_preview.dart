@@ -21,6 +21,7 @@ class _VideoPreviewState extends State<VideoPreview> {
   @override
   void initState() {
     super.initState();
+    MediaKit.ensureInitialized();
     // Load the file but wait for the user to press play.
     _player.open(Media(widget.path), play: false);
   }
