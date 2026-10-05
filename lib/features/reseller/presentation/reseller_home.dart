@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/widgets/app_header_title.dart';
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/providers/settings_providers.dart';
+import '../../../shared/enums/enums.dart';
 import '../application/reseller_providers.dart';
 import '../data/reseller_config.dart';
 import '../data/reseller_web_controller.dart';
@@ -32,6 +33,7 @@ class _ResellerHomeState extends ConsumerState<ResellerHome> {
       _web = ResellerWebController(
         initial: pending ?? ResellerConfig.homeUri,
         onSession: _onSession,
+        onBackToClipboard: _backToClipboard,
       );
       if (pending != null) {
         // The deep link is consumed by the initial load.
@@ -55,6 +57,14 @@ class _ResellerHomeState extends ConsumerState<ResellerHome> {
     if (authenticated && web != null) {
       unawaited(ref.read(resellerPushProvider).register(web.pushRequest));
     }
+  }
+
+  /// The site's « clipboard » button: same as picking clipboard in the badge
+  /// (the reseller session is kept).
+  void _backToClipboard() {
+    unawaited(ref
+        .read(settingsControllerProvider.notifier)
+        .setAppMode(AppMode.clipboard));
   }
 
   /// Confirms, wipes the WebView session, then returns to the clipboard space.

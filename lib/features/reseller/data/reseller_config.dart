@@ -9,6 +9,10 @@ abstract final class ResellerConfig {
   static const mainHost = 'poma-original.com';
 
   static final loginUri = Uri.https(host, '/login');
+
+  /// JavaScript channel the site looks for to know it runs inside the app
+  /// (see `BackToShopButton` in the poma-original repo).
+  static const appChannel = 'InfluencorApp';
   static final homeUri = Uri.https(host, '/');
 
   /// The WebView plugin ships for Android, iOS and macOS only; elsewhere the

@@ -15,11 +15,16 @@ class ResellerWebController {
   ResellerWebController({
     required Uri initial,
     required this.onSession,
+    this.onBackToClipboard,
   }) {
     web = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..addJavaScriptChannel('PomaSession', onMessageReceived: _onMessage)
       ..addJavaScriptChannel('PomaPush', onMessageReceived: _onPushMessage)
+      // Its mere presence tells the site it runs inside the app (the reseller
+      // header then shows « clipboard » instead of « Boutique Pôma »).
+      ..addJavaScriptChannel(ResellerConfig.appChannel,
+          onMessageReceived: _onAppMessage)
       ..setNavigationDelegate(NavigationDelegate(
         onProgress: (p) => progress.value = p,
         onPageStarted: (_) {
@@ -55,6 +60,10 @@ class ResellerWebController {
   /// Called with `true` / `false` each time the session probe answers.
   final ValueChanged<bool> onSession;
 
+  /// The site's « clipboard » button: leave the reseller space for the
+  /// clipboard one. Only a mode switch — nothing is read from the page.
+  final VoidCallback? onBackToClipboard;
+
   final progress = ValueNotifier<int>(0);
   final error = ValueNotifier<bool>(false);
 
@@ -64,6 +73,15 @@ class ResellerWebController {
       if (data is Map && data['n'] == _nonce && data['a'] is bool) {
         onSession(data['a'] as bool);
       }
+    } catch (_) {
+      // ignore malformed messages
+    }
+  }
+
+  void _onAppMessage(JavaScriptMessage m) {
+    try {
+      final data = jsonDecode(m.message);
+      if (data is Map && data['action'] == 'clipboard') onBackToClipboard?.call();
     } catch (_) {
       // ignore malformed messages
     }
