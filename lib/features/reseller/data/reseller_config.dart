@@ -10,6 +10,10 @@ abstract final class ResellerConfig {
 
   static final loginUri = Uri.https(host, '/login');
 
+  /// Entry of « Accès professionnel » (About screen): the public page of the
+  /// reseller program. Signing in starts from there (« Se connecter »).
+  static final aboutUri = Uri.https(host, '/about');
+
   /// JavaScript channel the site looks for to know it runs inside the app
   /// (see `BackToShopButton` in the poma-original repo).
   static const appChannel = 'InfluencorApp';

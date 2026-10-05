@@ -9,9 +9,10 @@ import '../data/reseller_config.dart';
 import '../data/reseller_web_controller.dart';
 import 'reseller_web_view.dart';
 
-/// "Accès professionnel": runs https://reseller.poma-original.com/login inside
-/// the app. When the site reports that a session now exists, the hidden
-/// `reseller` flag is stored and the app switches to the reseller space.
+/// "Accès professionnel": opens https://reseller.poma-original.com/about (the
+/// reseller program page) inside the app; the user signs in from there. When
+/// the site reports that a session now exists, the hidden `reseller` flag is
+/// stored and the app switches to the reseller space.
 class ResellerLoginScreen extends ConsumerStatefulWidget {
   const ResellerLoginScreen({super.key});
 
@@ -29,8 +30,9 @@ class _ResellerLoginScreenState extends ConsumerState<ResellerLoginScreen> {
     super.initState();
     if (ResellerConfig.webViewSupported) {
       _web = ResellerWebController(
-        initial: ResellerConfig.loginUri,
+        initial: ResellerConfig.aboutUri,
         onSession: _onSession,
+        onBackToClipboard: () => context.go('/'),
       );
     }
   }
@@ -79,7 +81,7 @@ class _ResellerLoginScreenState extends ConsumerState<ResellerLoginScreen> {
           ),
         ),
         body: web == null
-            ? ResellerBrowserFallback(uri: ResellerConfig.loginUri)
+            ? ResellerBrowserFallback(uri: ResellerConfig.aboutUri)
             : ResellerWebView(controller: web),
       ),
     );

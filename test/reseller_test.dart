@@ -93,6 +93,12 @@ void main() {
       expect(ResellerConfig.loginUri.toString(),
           'https://reseller.poma-original.com/login');
     });
+
+    test('professional access opens the reseller program /about', () {
+      expect(ResellerConfig.aboutUri.toString(),
+          'https://reseller.poma-original.com/about');
+      expect(ResellerConfig.isTrusted(ResellerConfig.aboutUri), isTrue);
+    });
   });
 
   group('mode badge', () {
