@@ -11,6 +11,8 @@ Cette section explique les fonctionnalités principales d'Influencor.
 - [Images, vidéos et partage](./media-and-sharing.md)
 - [Tableaux](./tables.md)
 - [Recherche, favoris et corbeille](./search-favorites-trash.md)
+- [Menu, comptabilité et tâches](./accounting-and-tasks.md)
+- [Degany, l'assistant IA](./assistant.md)
 
 ## Vue d'ensemble
 

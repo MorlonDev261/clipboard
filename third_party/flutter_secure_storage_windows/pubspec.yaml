@@ -1,0 +1,25 @@
+name: flutter_secure_storage_windows
+description: Influencor copy of the Windows implementation of flutter_secure_storage 4.1.0, without the C++ plugin (which needs Visual Studio ATL); storage is DPAPI from Dart FFI.
+publish_to: none
+repository: https://github.com/mogol/flutter_secure_storage
+version: 4.1.0+influencor
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+  flutter: '>=3.19.0'
+
+dependencies:
+  ffi: ^2.0.0
+  flutter:
+    sdk: flutter
+  flutter_secure_storage_platform_interface: ^2.0.0
+  path: ^1.8.0
+  path_provider: ^2.0.0
+  win32: ^5.5.4
+
+flutter:
+  plugin:
+    implements: flutter_secure_storage
+    platforms:
+      windows:
+        dartPluginClass: FlutterSecureStorageWindows

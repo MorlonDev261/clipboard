@@ -5,6 +5,7 @@ import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
 
 import 'file_names.dart';
+import '../../../core/services/storage_permission_service.dart';
 import '../domain/library_entry.dart';
 import '../domain/table_document.dart';
 import 'metadata_store.dart';
@@ -187,6 +188,23 @@ class LibraryRepository {
     return file.path;
   }
 
+  /// Creates a table `.json` file. Returns the created file path.
+  Future<String> createTable(
+    String dirPath, {
+    required String name,
+    required TableDocument table,
+  }) async {
+    final base = _sanitize(name.trim().isEmpty ? 'Tableau' : name.trim());
+    final path = await _claimFile(p.join(dirPath, '$base.json'));
+    try {
+      await File(path).writeAsString(table.toPrettyJson(), encoding: utf8);
+    } catch (_) {
+      await _dropClaim(path);
+      rethrow;
+    }
+    return path;
+  }
+
   /// Copies an image into a hidden `.attachments` folder next to notes in
   /// [dirPath] and returns its absolute path. Hidden, so it never clutters the
   /// folder listing, but it is still counted in the folder stats (see
@@ -288,6 +306,68 @@ class LibraryRepository {
     final target = await _claimFile(p.join(parent, '$base (copie)$ext'));
     try {
       await _copyInto(path, target);
+    } catch (_) {
+      await _dropClaim(target);
+      rethrow;
+    }
+    return target;
+  }
+
+  /// Stores a metadata-free copy of [path] (produced into [cleanedTemp]).
+  ///
+  /// [replace] swaps the original in place (copy next to it, then one rename,
+  /// so a failure can never leave a truncated original); otherwise the copy is
+  /// added beside it as `name_clean.ext`. Returns the resulting path.
+  Future<String> storeCleaned(
+    String path,
+    String cleanedTemp, {
+    required bool replace,
+  }) async {
+    if (replace) {
+      final tmp = File('$path.influencor-tmp');
+      try {
+        await _copyInto(cleanedTemp, tmp.path);
+        await tmp.rename(path);
+        // Same name, new size: refresh the gallery entry.
+        await StoragePermissionService().scanMedia([path]);
+      } catch (_) {
+        try {
+          if (await tmp.exists()) await tmp.delete();
+        } catch (_) {}
+        rethrow;
+      }
+      return path;
+    }
+    final target = await _claimFile(p.join(
+      p.dirname(path),
+      '${p.basenameWithoutExtension(path)}_clean${p.extension(cleanedTemp)}',
+    ));
+    try {
+      await _copyInto(cleanedTemp, target);
+    } catch (_) {
+      await _dropClaim(target);
+      rethrow;
+    }
+    await StoragePermissionService().scanMedia([target]);
+    return target;
+  }
+
+  /// Stores a metadata-free copy of [sourcePath] (produced into [cleanedTemp])
+  /// in the library folder [dirPath], as `name_clean.ext`, never overwriting.
+  /// Returns the created path.
+  Future<String> storeCleanedIn(
+    String dirPath,
+    String sourcePath,
+    String cleanedTemp,
+  ) async {
+    await Directory(dirPath).create(recursive: true);
+    final target = await _claimFile(p.join(
+      dirPath,
+      '${p.basenameWithoutExtension(sourcePath)}_clean'
+      '${p.extension(cleanedTemp)}',
+    ));
+    try {
+      await _copyInto(cleanedTemp, target);
     } catch (_) {
       await _dropClaim(target);
       rethrow;
