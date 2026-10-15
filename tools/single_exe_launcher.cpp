@@ -117,7 +117,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
 
   const std::wstring base = appData + L"\\Influencor\\WindowsApp";
   const std::wstring zip = appData + L"\\Influencor\\payload.zip";
-  const std::wstring app = base + L"\\clipboard.exe";
+  const std::wstring app = base + L"\\influencor.exe";
 
   CreateDirectoryW((appData + L"\\Influencor").c_str(), nullptr);
   if (!extractPayload(self, zip)) {

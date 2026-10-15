@@ -12,6 +12,8 @@ import 'package:go_router/go_router.dart';
 
 import 'package:path/path.dart' as p;
 
+import '../../../core/widgets/app_inputs.dart';
+import '../../../core/widgets/app_dialog.dart';
 import '../../reseller/application/reseller_providers.dart';
 import '../../../app/constants/app_constants.dart';
 
@@ -34,6 +36,10 @@ import '../../../core/services/content_share_ui.dart';
 import '../../../core/widgets/empty_state.dart';
 
 import '../../../shared/enums/enums.dart';
+
+import '../../cleaner/presentation/deganeo_clean_dialog.dart';
+
+import '../../cleaner/presentation/deganeo_icon.dart';
 
 import '../application/browse_filtering.dart';
 
@@ -100,13 +106,28 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
         entries.map((e) => e.path).toSet();
   }
 
+  /// The selected entries that are images (the only ones Deganeo cleans here).
+  List<String> get _selectedImagePaths {
+    final visibleByPath = {for (final entry in _visible) entry.path: entry};
+    return [
+      for (final path in _selected)
+        if ((visibleByPath[path]?.kind ?? kindForFile(p.basename(path))) ==
+            EntryKind.image)
+          path,
+    ];
+  }
+
   bool get _selectedOnlyImages {
     if (_selected.isEmpty) return false;
-    final visibleByPath = {for (final entry in _visible) entry.path: entry};
-    return _selected.every((path) {
-      final entry = visibleByPath[path];
-      return (entry?.kind ?? kindForFile(p.basename(path))) == EntryKind.image;
-    });
+    return _selectedImagePaths.length == _selected.length;
+  }
+
+  /// Deganeo over the selected images, one at a time, then leaves selection.
+  Future<void> _cleanSelectedImages() async {
+    final paths = _selectedImagePaths;
+    if (paths.isEmpty) return;
+    await _runDeganeo(context, ref, paths, _dir);
+    _clearSelection();
   }
 
   Future<void> _shareSelectedImages() async {
@@ -181,6 +202,12 @@ class _BrowseScreenState extends ConsumerState<BrowseScreen> {
           tooltip: strings.selectAll,
           onPressed: allSelected ? _clearSelection : () => _selectAll(_visible),
         ),
+        if (_selectedImagePaths.isNotEmpty)
+          IconButton(
+            icon: const DeganeoIcon(size: 24),
+            tooltip: 'Deganeo',
+            onPressed: _cleanSelectedImages,
+          ),
         if (_selectedOnlyImages)
           IconButton(
             icon: const Icon(Icons.ios_share),
@@ -1072,7 +1099,28 @@ class _SelectableEntryThumb extends StatelessWidget {
   }
 }
 
-class _EntryTrailingActions extends StatelessWidget {
+/// Runs the one-at-a-time Deganeo flow and reports what was saved.
+Future<void> _runDeganeo(
+  BuildContext context,
+  WidgetRef ref,
+  List<String> paths,
+  String dir,
+) async {
+  final strings = ref.read(appStringsProvider);
+  final outcome = await showDeganeoCleanFlow(
+    context,
+    paths: paths,
+    parentDir: dir,
+  );
+  if (outcome == null || !context.mounted) return;
+  ScaffoldMessenger.of(context)
+    ..clearSnackBars()
+    ..showSnackBar(SnackBar(
+      content: Text(strings.deganeoSummary(outcome.replaced, outcome.copied)),
+    ));
+}
+
+class _EntryTrailingActions extends ConsumerWidget {
   const _EntryTrailingActions({
     required this.dir,
     required this.entry,
@@ -1089,7 +1137,7 @@ class _EntryTrailingActions extends StatelessWidget {
   final bool dense;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final starSize = dense ? 15.0 : 18.0;
     final menuSize = dense ? 30.0 : 36.0;
 
@@ -1103,6 +1151,17 @@ class _EntryTrailingActions extends StatelessWidget {
               Icons.star,
               size: starSize,
               color: Theme.of(context).colorScheme.primary,
+            ),
+          ),
+        if (entry.kind == EntryKind.image)
+          SizedBox.square(
+            dimension: menuSize,
+            child: IconButton(
+              padding: EdgeInsets.zero,
+              visualDensity: VisualDensity.compact,
+              tooltip: 'Deganeo',
+              icon: DeganeoIcon(size: dense ? 18 : 22),
+              onPressed: () => _runDeganeo(context, ref, [entry.path], dir),
             ),
           ),
         SizedBox.square(
@@ -1353,29 +1412,13 @@ Future<String?> promptForName(
   required String cancelLabel,
   String? initialValue,
 }) {
-  final controller = TextEditingController(text: initialValue);
-
-  return showDialog<String>(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: Text(title),
-      content: TextField(
-        controller: controller,
-        autofocus: true,
-        decoration: InputDecoration(labelText: label),
-        onSubmitted: (v) => Navigator.pop(context, v),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text(cancelLabel),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.pop(context, controller.text),
-          child: Text(confirmLabel),
-        ),
-      ],
-    ),
+  return showTextPromptDialog(
+    context,
+    title: title,
+    label: label,
+    confirmLabel: confirmLabel,
+    cancelLabel: cancelLabel,
+    initialValue: initialValue,
   );
 }
 
@@ -1385,17 +1428,15 @@ Future<List<String>?> _promptTags(
     BuildContext context, AppStrings strings, List<String> current) {
   final controller = TextEditingController(text: current.join(', '));
 
-  return showDialog<List<String>>(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: Text(strings.editTags),
-      content: TextField(
+  return showAppDialog<List<String>>(
+    context,
+    builder: (context) => AppDialog(
+      title: strings.editTags,
+      content: AppTextField(
         controller: controller,
         autofocus: true,
-        decoration: InputDecoration(
-          labelText: strings.tags,
-          hintText: strings.tagsHint,
-        ),
+        label: strings.tags,
+        hint: strings.tagsHint,
       ),
       actions: [
         TextButton(
@@ -1420,21 +1461,12 @@ Future<List<String>?> _promptTags(
 }
 
 Future<bool?> confirmDelete(BuildContext context, AppStrings strings) {
-  return showDialog<bool>(
-    context: context,
-    builder: (context) => AlertDialog(
-      title: Text(strings.deleteTitle),
-      content: Text(strings.deleteMessage),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context, false),
-          child: Text(strings.cancel),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.pop(context, true),
-          child: Text(strings.delete),
-        ),
-      ],
-    ),
+  return showConfirmDialog(
+    context,
+    title: strings.deleteTitle,
+    message: strings.deleteMessage,
+    confirmLabel: strings.delete,
+    cancelLabel: strings.cancel,
+    destructive: true,
   );
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/widgets/app_dialog.dart';
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../../library/application/library_providers.dart';
@@ -93,24 +94,15 @@ class TrashScreen extends ConsumerWidget {
 
   Future<void> _confirmEmpty(
       BuildContext context, WidgetRef ref, AppStrings strings) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(strings.emptyTrashTitle),
-        content: Text(strings.emptyTrashMessage),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(strings.cancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(strings.emptyTrash),
-          ),
-        ],
-      ),
+    final ok = await showConfirmDialog(
+      context,
+      title: strings.emptyTrashTitle,
+      message: strings.emptyTrashMessage,
+      confirmLabel: strings.emptyTrash,
+      cancelLabel: strings.cancel,
+      destructive: true,
     );
-    if (ok == true) {
+    if (ok) {
       try {
         await ref.read(libraryControllerProvider).emptyTrash();
       } catch (_) {

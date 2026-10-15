@@ -34,7 +34,7 @@ class AppShell extends ConsumerWidget {
     _Destination('/favorites', Icons.star_border, Icons.star),
     _Destination('/assistant', Icons.assistant_outlined, Icons.assistant),
     _Destination('/trash', Icons.delete_outline, Icons.delete),
-    _Destination('/settings', Icons.settings_outlined, Icons.settings),
+    _Destination('/menu', Icons.menu, Icons.menu),
   ];
 
   int get _selectedIndex {
@@ -44,7 +44,12 @@ class AppShell extends ConsumerWidget {
       return 2;
     }
     if (location.startsWith('/trash')) return 3;
-    if (location.startsWith('/settings') || location.startsWith('/about')) {
+    // Menu hub and everything reached from it (accounting, tasks, settings).
+    if (location.startsWith('/menu') ||
+        location.startsWith('/accounting') ||
+        location.startsWith('/task') ||
+        location.startsWith('/settings') ||
+        location.startsWith('/about')) {
       return 4;
     }
     return 0;
@@ -58,6 +63,14 @@ class AppShell extends ConsumerWidget {
     final navigator = Navigator.of(context);
     if (navigator.canPop()) {
       navigator.pop();
+      return;
+    }
+    // Accounting, tasks and settings are reached from the menu: back goes
+    // there first, not straight to the home tab.
+    if (location.startsWith('/accounting') ||
+        location.startsWith('/task') ||
+        location.startsWith('/settings')) {
+      context.go('/menu');
       return;
     }
     if (location != '/') {
@@ -80,7 +93,7 @@ class AppShell extends ConsumerWidget {
       strings.favorites,
       strings.assistant,
       strings.trash,
-      strings.settings,
+      strings.menu,
     ];
     final isDesktop =
         MediaQuery.sizeOf(context).width >= AppConstants.desktopBreakpoint;

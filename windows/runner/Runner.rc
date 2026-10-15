@@ -89,12 +89,12 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.clipboard" "\0"
+            VALUE "CompanyName", "com.influencor" "\0"
             VALUE "FileDescription", "Influencor" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "clipboard" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 com.clipboard. All rights reserved." "\0"
-            VALUE "OriginalFilename", "clipboard.exe" "\0"
+            VALUE "InternalName", "influencor" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 com.influencor. All rights reserved." "\0"
+            VALUE "OriginalFilename", "influencor.exe" "\0"
             VALUE "ProductName", "Influencor" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END

@@ -1,0 +1,58 @@
+# =============================================================================
+# Mi Kandra Edge — routeur d'entrée partagé. Voir scripts/edge/mi-kandra-edge.sh.
+#
+# Ce fichier est IDENTIQUE dans chaque projet (poma, mga, artest…) : peu
+# importe lequel démarre le routeur, le nom de projet Compose est fixe, donc
+# l'opération est idempotente.
+# =============================================================================
+name: mi-kandra-edge
+
+services:
+  edge:
+    image: nginx:1.27.5-alpine
+    container_name: mi-kandra-edge
+    restart: unless-stopped
+    labels:
+      org.mi-kandra.role: edge
+      org.mi-kandra.edge.version: "1"
+    # Pas de docker-entrypoint (pas d'envsubst) : la config est statique.
+    entrypoint: ["nginx", "-g", "daemon off;"]
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./edge-nginx.conf:/etc/nginx/nginx.conf:ro
+      - mi-kandra-edge-routes:/etc/mi-kandra-edge/routes.d
+    networks:
+      - mi-kandra-edge
+    # Durcissement : racine en lecture seule, aucune capacité sauf bind <1024, chown
+    # et le drop de privilèges des workers.
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE, SETUID, SETGID, CHOWN]
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+    pids_limit: 256
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/__mi_kandra_edge_health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  mi-kandra-edge-routes:
+    name: mi-kandra-edge-routes
+
+networks:
+  mi-kandra-edge:
+    name: mi-kandra-edge

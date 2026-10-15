@@ -18,6 +18,12 @@ import 'formats/webp_handler.dart';
 import 'signature_scanner.dart';
 import 'unsupported_content.dart';
 
+typedef InspectResult = ({
+  MediaFormat format,
+  List<MetadataFinding> findings,
+  String? error,
+});
+
 /// detect → strip → re-scan, in one place. Synchronous-looking, isolate-free:
 /// [MetadataCleanerService] runs it off the UI thread; tests call it directly.
 class CleanPipeline {
@@ -131,6 +137,56 @@ class CleanPipeline {
         format: format,
         sourcePath: sourcePath,
         errorMessage: e.toString(),
+      );
+    }
+  }
+
+  /// Read-only: what [sourcePath] carries today, with values where the format
+  /// exposes them. Never writes a file; never throws.
+  Future<InspectResult> inspect(
+    String sourcePath, [
+    CleanOptions options = const CleanOptions(),
+  ]) async {
+    var format = MediaFormat.unknown;
+    try {
+      final source = File(sourcePath);
+      format = await FormatDetector.detect(source);
+      if (format == MediaFormat.unknown) {
+        return (
+          format: format,
+          findings: const <MetadataFinding>[],
+          error: null
+        );
+      }
+      final findings = [
+        ...(await _handlers[format]!.scan(source, options)).findings
+      ];
+      if (_imageFormats.contains(format)) {
+        final bytes = await source.readAsBytes();
+        for (final sig in SignatureScanner.scan(bytes)) {
+          if (!findings.any((f) => f.category == sig.category && f.sensitive)) {
+            findings.add(sig);
+          }
+        }
+      }
+      return (format: format, findings: findings, error: null);
+    } on UnsupportedContent catch (e) {
+      return (
+        format: format,
+        findings: const <MetadataFinding>[],
+        error: e.message
+      );
+    } on FormatException catch (e) {
+      return (
+        format: format,
+        findings: const <MetadataFinding>[],
+        error: e.message
+      );
+    } catch (e) {
+      return (
+        format: format,
+        findings: const <MetadataFinding>[],
+        error: e.toString()
       );
     }
   }

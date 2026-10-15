@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 
+import '../widgets/app_dialog.dart';
 import '../../features/library/domain/library_entry.dart';
 import '../widgets/empty_state.dart';
 import '../l10n/app_strings.dart';
@@ -800,28 +801,12 @@ class _FileBrowserScreenState extends ConsumerState<_FileBrowserScreen> {
     final cur = _current;
     if (cur == null) return;
     final strings = ref.read(appStringsProvider);
-    final controller = TextEditingController();
-    final name = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(strings.newFolderTitle),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: InputDecoration(labelText: strings.folderNameLabel),
-          onSubmitted: (v) => Navigator.pop(context, v),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(strings.cancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, controller.text),
-            child: Text(strings.create),
-          ),
-        ],
-      ),
+    final name = await showTextPromptDialog(
+      context,
+      title: strings.newFolderTitle,
+      label: strings.folderNameLabel,
+      confirmLabel: strings.create,
+      cancelLabel: strings.cancel,
     );
     final trimmed = name?.trim() ?? '';
     if (trimmed.isEmpty) return;

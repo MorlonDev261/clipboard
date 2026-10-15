@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:clipboard/features/cleaner/data/binary.dart';
+import 'package:influencor/features/cleaner/data/binary.dart';
 
 Uint8List bytes(Iterable<int> v) => Uint8List.fromList(v.toList());
 

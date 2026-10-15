@@ -26,12 +26,14 @@ abstract final class AppTheme {
       error: AppColors.error,
     );
 
+    final appBackground =
+        isDark ? AppColors.backgroundDark : AppColors.backgroundLight;
+
     final base = ThemeData(
       useMaterial3: true,
       brightness: brightness,
       colorScheme: colorScheme,
-      scaffoldBackgroundColor:
-          isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
+      scaffoldBackgroundColor: appBackground,
     );
 
     return base.copyWith(
@@ -48,6 +50,7 @@ abstract final class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
+        fillColor: appBackground,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,

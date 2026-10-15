@@ -81,7 +81,9 @@ class ResellerWebController {
   void _onAppMessage(JavaScriptMessage m) {
     try {
       final data = jsonDecode(m.message);
-      if (data is Map && data['action'] == 'clipboard') onBackToClipboard?.call();
+      if (data is Map && data['action'] == 'clipboard') {
+        onBackToClipboard?.call();
+      }
     } catch (_) {
       // ignore malformed messages
     }

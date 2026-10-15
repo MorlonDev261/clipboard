@@ -75,7 +75,7 @@ foreach ($target in $targets) {
 
   Copy-IfExists (Join-Path $repo 'build/installer/InfluencorSetup.exe') $windowsDir 'InfluencorSetup.exe'
   Copy-IfExists (Join-Path $repo 'build/windows/x64/runner/Influencor.exe') $windowsDir 'Influencor-portable.exe'
-  Copy-IfExists (Join-Path $repo 'build/windows/x64/runner/Release/clipboard.exe') $windowsDir 'clipboard.exe'
+  Copy-IfExists (Join-Path $repo 'build/windows/x64/runner/Release/influencor.exe') $windowsDir 'influencor.exe'
 
   Copy-DirectoryIfExists (Join-Path $repo 'build/web') $webDir
 }

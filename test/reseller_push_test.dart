@@ -1,5 +1,5 @@
-import 'package:clipboard/features/reseller/data/reseller_config.dart';
-import 'package:clipboard/features/reseller/data/reseller_push.dart';
+import 'package:influencor/features/reseller/data/reseller_config.dart';
+import 'package:influencor/features/reseller/data/reseller_push.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

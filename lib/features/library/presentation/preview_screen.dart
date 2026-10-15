@@ -457,6 +457,7 @@ class _PreviewScreenState extends ConsumerState<PreviewScreen> {
                   top: false,
                   child: IgnorePointer(
                     child: _PageDots(
+                      controller: _pageController,
                       count: entries.length,
                       current: _currentIndex,
                     ),
@@ -507,18 +508,36 @@ class _OverlayButton extends StatelessWidget {
 }
 
 /// Page dots for the gallery; shows a sliding window when there are many.
+///
+/// Driven by the pager's scroll offset (not by the settled page index), so
+/// the active dot stretches and fades under the finger instead of jumping
+/// once the swipe ends.
 class _PageDots extends StatelessWidget {
-  const _PageDots({required this.count, required this.current});
+  const _PageDots({
+    required this.controller,
+    required this.count,
+    required this.current,
+  });
 
   static const _window = 9;
 
+  final PageController controller;
   final int count;
+
+  /// Settled page, used until the pager has been laid out.
   final int current;
+
+  double get _page {
+    final max = (count - 1).toDouble();
+    if (controller.hasClients && controller.position.haveDimensions) {
+      return (controller.page ?? current.toDouble()).clamp(0.0, max);
+    }
+    return current.toDouble().clamp(0.0, max);
+  }
 
   @override
   Widget build(BuildContext context) {
     final shown = count < _window ? count : _window;
-    final start = (current - shown ~/ 2).clamp(0, count - shown);
     final scheme = Theme.of(context).colorScheme;
     return Center(
       child: DecoratedBox(
@@ -528,25 +547,38 @@ class _PageDots extends StatelessWidget {
         ),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              for (var i = start; i < start + shown; i++)
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  margin: const EdgeInsets.symmetric(horizontal: 3),
-                  width: i == current ? 16 : 7,
-                  height: 7,
-                  decoration: BoxDecoration(
-                    color: i == current
-                        ? scheme.primary
-                        : Colors.white.withValues(alpha: 0.7),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                ),
-            ],
+          child: AnimatedBuilder(
+            animation: controller,
+            builder: (context, _) {
+              final page = _page;
+              final start = (page.round() - shown ~/ 2).clamp(0, count - shown);
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (var i = start; i < start + shown; i++)
+                    _dot(scheme, (1 - (page - i).abs()).clamp(0.0, 1.0)),
+                ],
+              );
+            },
           ),
         ),
+      ),
+    );
+  }
+
+  /// [amount] is 1 for the dot the pager sits on, 0 for one a page or more away.
+  Widget _dot(ColorScheme scheme, double amount) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 3),
+      width: 7 + 9 * amount,
+      height: 7,
+      decoration: BoxDecoration(
+        color: Color.lerp(
+          Colors.white.withValues(alpha: 0.7),
+          scheme.primary,
+          amount,
+        ),
+        borderRadius: BorderRadius.circular(999),
       ),
     );
   }

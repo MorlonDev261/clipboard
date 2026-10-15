@@ -16,6 +16,8 @@ class TableColumnDef {
   final String title;
   final String type;
 
+  bool get isBracketed => TableDocument.isBracketColumnTitle(title);
+
   Map<String, Object> toJson() => {
         'id': id,
         'title': title,
@@ -46,6 +48,14 @@ class TableDocument {
 
   final List<TableColumnDef> columns;
   final List<TableRowData> rows;
+
+  /// Returns whether a column title is wrapped in square brackets, e.g. `[Secret]`.
+  static bool isBracketColumnTitle(String title) {
+    final trimmed = title.trim();
+    return trimmed.length >= 2 &&
+        trimmed.startsWith('[') &&
+        trimmed.endsWith(']');
+  }
 
   static bool looksCompatible(Object? decoded) => tryParse(decoded) != null;
 

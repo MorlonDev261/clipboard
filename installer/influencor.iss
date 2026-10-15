@@ -1,7 +1,7 @@
 #define MyAppName "Influencor"
 #define MyAppVersion "0.1.0"
 #define MyAppPublisher "Influencor"
-#define MyAppExeName "clipboard.exe"
+#define MyAppExeName "influencor.exe"
 
 [Setup]
 AppId={{A3E3C581-3C47-4D08-8E1D-8B6F7D873CA3}

@@ -20,6 +20,7 @@ fichiers.
 - [Images, vidéos et partage](./features/media-and-sharing.md)
 - [Tableaux](./features/tables.md)
 - [Recherche, favoris et corbeille](./features/search-favorites-trash.md)
+- [Menu, comptabilité et tâches](./features/accounting-and-tasks.md)
 
 ## Aide
 

@@ -1,0 +1,21 @@
+# Sauvegarde des données critiques (volumes MinIO/Let's Encrypt + base locale).
+# La phrase de passe vient d'un fichier lisible par root seulement :
+#   sudo install -m 600 /dev/null /etc/mi-kandra/backup.env
+#   echo 'MI_KANDRA_BACKUP_PASSPHRASE=<phrase longue et unique>' | sudo tee -a /etc/mi-kandra/backup.env
+# Copiez ensuite le dossier de sauvegarde HORS du serveur (rsync/rclone/object storage).
+[Unit]
+Description=Mi Kandra - sauvegarde (@NAME@)
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=@PROJECT_DIR@
+EnvironmentFile=-/etc/mi-kandra/backup.env
+ExecStart=/bin/sh @PROJECT_DIR@/scripts/edge/mi-kandra-backup.sh backup --keep 7
+ExecStartPost=/bin/sh @PROJECT_DIR@/scripts/edge/mi-kandra-backup.sh verify
+NoNewPrivileges=true
+PrivateTmp=true
+Nice=10
+IOSchedulingClass=idle
+TimeoutStartSec=2h

@@ -5,6 +5,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -55,6 +56,18 @@ class MainActivity : FlutterActivity() {
             when (call.method) {
                 "hasStorageAccess" -> result.success(hasStorageAccess())
                 "requestStorageAccess" -> requestStorageAccess(result)
+                "scanMedia" -> {
+                    // Registers files written with plain java.io in MediaStore so
+                    // the gallery and other apps' pickers (Facebook, WhatsApp...)
+                    // list them as images / videos.
+                    val paths = call.argument<List<String>>("paths") ?: emptyList()
+                    if (paths.isEmpty()) {
+                        result.success(true)
+                    } else {
+                        MediaScannerConnection.scanFile(this, paths.toTypedArray(), null, null)
+                        result.success(true)
+                    }
+                }
                 else -> result.notImplemented()
             }
         }

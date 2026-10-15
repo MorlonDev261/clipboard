@@ -1,11 +1,11 @@
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:clipboard/features/cleaner/data/binary.dart';
-import 'package:clipboard/features/cleaner/data/clean_pipeline.dart';
-import 'package:clipboard/features/cleaner/data/exif_inspector.dart';
-import 'package:clipboard/features/cleaner/domain/clean_options.dart';
-import 'package:clipboard/features/cleaner/domain/clean_report.dart';
+import 'package:influencor/features/cleaner/data/binary.dart';
+import 'package:influencor/features/cleaner/data/clean_pipeline.dart';
+import 'package:influencor/features/cleaner/data/exif_inspector.dart';
+import 'package:influencor/features/cleaner/domain/clean_options.dart';
+import 'package:influencor/features/cleaner/domain/clean_report.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'fixtures.dart';

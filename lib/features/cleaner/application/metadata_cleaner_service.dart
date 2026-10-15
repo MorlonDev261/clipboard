@@ -16,7 +16,7 @@ class MetadataCleanerService {
 
   Future<CleanReport> clean(
     String sourcePath, {
-    CleanOptions options = const CleanOptions(),
+    CleanOptions options = CleanOptions.stripAll,
   }) async {
     // path_provider uses platform channels: resolve it on the main isolate.
     final dir = await getTemporaryDirectory();
@@ -25,6 +25,10 @@ class MetadataCleanerService {
       () => const CleanPipeline().run(sourcePath, Directory(outPath), options),
     );
   }
+
+  /// Lists the metadata a file carries without modifying anything.
+  Future<InspectResult> inspect(String sourcePath) =>
+      Isolate.run(() => const CleanPipeline().inspect(sourcePath));
 
   /// Removes cleaned copies left in the temp folder by a previous run that was
   /// killed before the user saved or discarded them.

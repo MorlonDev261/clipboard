@@ -15,7 +15,7 @@ La navigation principale se fait avec la barre en bas de l'écran.
 - **Favoris**: affiche les éléments marqués avec une étoile.
 - **Assistant**: espace assistant intégré.
 - **Corbeille**: éléments supprimés restaurables.
-- **Réglages**: options de l'application.
+- **Menu** (icône à trois barres): Comptabilité, Tâches et Réglages. Voir [Menu, comptabilité et tâches](./features/accounting-and-tasks.md).
 
 ## Sur desktop ou tablette
 

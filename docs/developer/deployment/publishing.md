@@ -2,6 +2,8 @@
 
 [← Documentation développeur](../README.md)
 
+> Site web: voir [Web: influencor.mi-kandra.org](./web-mi-kandra.md).
+
 ## Android / Google Play
 
 Le projet contient une configuration Android et peut générer APK/AAB via Flutter.

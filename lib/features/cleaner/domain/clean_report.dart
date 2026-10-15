@@ -95,6 +95,11 @@ enum CleanCaveat {
   /// A Matroska/WebM file embeds attachments (fonts, cover art) that are left
   /// untouched because subtitles may depend on them.
   attachmentsKept,
+
+  /// The rotation could not be applied to the pixels of this JPEG (progressive,
+  /// or edges not aligned on the MCU grid), so a minimal orientation flag with
+  /// no personal data is kept.
+  orientationFlagKept,
 }
 
 enum CleanStatus {

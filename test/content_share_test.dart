@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:ui' show Rect;
 
-import 'package:clipboard/core/services/content_share_service.dart';
+import 'package:influencor/core/services/content_share_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 

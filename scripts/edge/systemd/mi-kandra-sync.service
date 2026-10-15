@@ -1,0 +1,16 @@
+# Rattrape un `docker compose up` manuel : ré-enregistre les projets dans le routeur.
+# Installation : voir docs/07-deployment/mi-kandra-multi-stack.md, section 4.5
+# (substituer @PROJECT_DIR@ et @NAME@ ; unité installée sous le nom mi-kandra-<NOM>-sync.service).
+[Unit]
+Description=Mi Kandra - synchronisation des routes (@NAME@)
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=@PROJECT_DIR@
+ExecStart=/bin/sh @PROJECT_DIR@/scripts/edge/mi-kandra-edge.sh sync
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=read-only
+TimeoutStartSec=120

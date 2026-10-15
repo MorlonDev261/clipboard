@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/widgets/app_dialog.dart';
 import '../../../app/widgets/app_header_title.dart';
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/providers/settings_providers.dart';
@@ -70,25 +71,15 @@ class _ResellerHomeState extends ConsumerState<ResellerHome> {
   /// Confirms, wipes the WebView session, then returns to the clipboard space.
   Future<void> _signOut() async {
     final strings = ref.read(appStringsProvider);
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(strings.resellerSignOutTitle),
-        content: Text(strings.resellerSignOutBody),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(strings.cancel),
-          ),
-          FilledButton(
-            key: const ValueKey('reseller-sign-out-confirm'),
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(strings.resellerSignOut),
-          ),
-        ],
-      ),
+    final ok = await showConfirmDialog(
+      context,
+      title: strings.resellerSignOutTitle,
+      message: strings.resellerSignOutBody,
+      confirmLabel: strings.resellerSignOut,
+      cancelLabel: strings.cancel,
+      confirmKey: const ValueKey('reseller-sign-out-confirm'),
     );
-    if (ok != true) return;
+    if (!ok) return;
     final web = _web;
     if (web != null) {
       // Before the cookie is wiped: the server needs the session to delete it.
@@ -124,26 +115,27 @@ class _ResellerHomeState extends ConsumerState<ResellerHome> {
         if (!didPop) unawaited(_back());
       },
       child: Scaffold(
-        appBar: AppBar(
-          toolbarHeight: AppHeaderTitle.heightWithBadge,
-          title: const AppHeaderTitle(showModeBadge: true),
-          actions: [
-            IconButton(
-              key: const ValueKey('reseller-sign-out'),
-              tooltip: ref.watch(appStringsProvider).resellerSignOut,
-              icon: const Icon(Icons.logout),
-              onPressed: _signOut,
-            ),
-            if (web != null)
-              IconButton(
-                icon: const Icon(Icons.refresh),
-                onPressed: web.reload,
+        // With a WebView the site fills the whole screen: nothing of the app
+        // around it (the site has its own « clipboard » button and logout).
+        // Without one (desktop) the page is only an "open in browser" panel,
+        // which keeps the app header so the user can still leave the space.
+        appBar: web != null
+            ? null
+            : AppBar(
+                toolbarHeight: AppHeaderTitle.heightWithBadge,
+                title: const AppHeaderTitle(showModeBadge: true),
+                actions: [
+                  IconButton(
+                    key: const ValueKey('reseller-sign-out'),
+                    tooltip: ref.watch(appStringsProvider).resellerSignOut,
+                    icon: const Icon(Icons.logout),
+                    onPressed: _signOut,
+                  ),
+                ],
               ),
-          ],
-        ),
         body: web == null
             ? ResellerBrowserFallback(uri: ResellerConfig.homeUri)
-            : ResellerWebView(controller: web),
+            : SafeArea(child: ResellerWebView(controller: web)),
       ),
     );
   }

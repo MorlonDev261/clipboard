@@ -1,6 +1,6 @@
-import 'package:clipboard/features/library/application/browse_filtering.dart';
-import 'package:clipboard/features/library/domain/library_entry.dart';
-import 'package:clipboard/shared/enums/enums.dart';
+import 'package:influencor/features/library/application/browse_filtering.dart';
+import 'package:influencor/features/library/domain/library_entry.dart';
+import 'package:influencor/shared/enums/enums.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 

@@ -83,7 +83,7 @@ build/windows/x64/runner/Release/
 Exécutable principal:
 
 ```text
-build/windows/x64/runner/Release/clipboard.exe
+build/windows/x64/runner/Release/influencor.exe
 ```
 
 ## Installateur Windows

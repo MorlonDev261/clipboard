@@ -2,13 +2,13 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:clipboard/features/cleaner/data/binary.dart';
-import 'package:clipboard/features/cleaner/data/clean_pipeline.dart';
-import 'package:clipboard/features/cleaner/domain/clean_report.dart';
-import 'package:clipboard/features/library/data/library_repository.dart';
-import 'package:clipboard/features/library/data/metadata_store.dart';
-import 'package:clipboard/features/library/data/trash_store.dart';
-import 'package:clipboard/features/reseller/data/reseller_config.dart';
+import 'package:influencor/features/cleaner/data/binary.dart';
+import 'package:influencor/features/cleaner/data/clean_pipeline.dart';
+import 'package:influencor/features/cleaner/domain/clean_report.dart';
+import 'package:influencor/features/library/data/library_repository.dart';
+import 'package:influencor/features/library/data/metadata_store.dart';
+import 'package:influencor/features/library/data/trash_store.dart';
+import 'package:influencor/features/reseller/data/reseller_config.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 

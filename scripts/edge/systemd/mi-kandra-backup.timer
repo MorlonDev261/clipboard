@@ -1,0 +1,10 @@
+[Unit]
+Description=Mi Kandra - sauvegarde quotidienne (@NAME@)
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+RandomizedDelaySec=15min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,6 +1,6 @@
-import 'package:clipboard/core/l10n/app_strings.dart';
-import 'package:clipboard/features/library/application/library_providers.dart';
-import 'package:clipboard/features/library/domain/library_entry.dart';
+import 'package:influencor/core/l10n/app_strings.dart';
+import 'package:influencor/features/library/application/library_providers.dart';
+import 'package:influencor/features/library/domain/library_entry.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';

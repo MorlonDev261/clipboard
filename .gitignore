@@ -85,3 +85,7 @@ app.*.map.json
 
 # Firebase client config: downloaded per developer from the console
 **/android/app/google-services.json
+
+!.env.example
+/nginx/certs/*.pem
+/nginx/certs/*.key
