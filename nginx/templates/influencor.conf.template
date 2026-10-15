@@ -1,9 +1,9 @@
 # =============================================================================
 # Vhost Influencor (build web Flutter) — nginx d'origine Mi Kandra.
 #
-# Syntaxe envsubst :
-#   ${VAR}  → variable Docker injectée au démarrage (ex: ${INFLUENCOR_DOMAIN})
-#   $$var   → variable Nginx runtime (rendue $var après envsubst)
+# Syntaxe envsubst : ${VAR} est remplacé au démarrage, seulement pour les noms
+# filtrés par NGINX_ENVSUBST_FILTER (INFLUENCOR_*, SSL_*). Les variables Nginx
+# ($host, $uri…) s'écrivent donc normalement, avec un seul $.
 # =============================================================================
 
 # IP client réelle : derrière le routeur partagé (:8443, PROXY protocol) et/ou
@@ -39,7 +39,7 @@ server {
     listen 80;
     include /etc/nginx/snippets/mi-kandra-listen-http.conf;
     server_name ${INFLUENCOR_DOMAIN};
-    return 301 https://$$host$$request_uri;
+    return 301 https://$host$request_uri;
 }
 
 server {
@@ -67,21 +67,21 @@ server {
 
     # Fichiers non versionnés par hash : toujours revalidés, sinon une nouvelle
     # version du build resterait coincée dans le cache / le service worker.
-    location ~* ^/(index\.html|flutter_bootstrap\.js|flutter_service_worker\.js|version\.json|manifest\.json)$$ {
+    location ~* ^/(index\.html|flutter_bootstrap\.js|flutter_service_worker\.js|version\.json|manifest\.json)$ {
         add_header Cache-Control "no-cache" always;
         add_header X-Content-Type-Options "nosniff" always;
-        try_files $$uri =404;
+        try_files $uri =404;
     }
 
-    location ~* \.(?:js|wasm|css|png|jpg|jpeg|svg|ico|ttf|otf|woff2?|json|bin)$$ {
+    location ~* \.(?:js|wasm|css|png|jpg|jpeg|svg|ico|ttf|otf|woff2?|json|bin)$ {
         add_header Cache-Control "public, max-age=86400" always;
         add_header X-Content-Type-Options "nosniff" always;
-        try_files $$uri =404;
+        try_files $uri =404;
     }
 
     # Routes de l'app (go_router) : retombent sur index.html.
     location / {
         add_header Cache-Control "no-cache" always;
-        try_files $$uri $$uri/ /index.html;
+        try_files $uri $uri/ /index.html;
     }
 }

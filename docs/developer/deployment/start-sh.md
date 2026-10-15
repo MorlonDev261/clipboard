@@ -4,7 +4,13 @@
 
 `start.sh` publie la version **web** d'Influencor (`build/web`) sur un serveur Mi Kandra : il démarre un nginx Docker qui sert le site et le fait cohabiter avec les autres stacks du serveur. Il ne construit ni l'application Android ni l'installateur Windows : voir [Builds](../build/builds.md).
 
-Le contexte (domaine, ports, fichiers) est décrit dans [Web : influencor.mi-kandra.org](./web-mi-kandra.md).
+> **Retirée de `influencor.mi-kandra.org`.** Ce domaine sert désormais le site vitrine et
+> les téléchargements (dépôt [`influencor-web`](https://github.com/MorlonDev261/influencor-web)).
+> L'app web Flutter n'est plus déployée par défaut : `start.sh` refuse de démarrer tant que
+> `INFLUENCOR_DOMAIN` est vide ou vaut `influencor.mi-kandra.org`. Sur un serveur où elle
+> tourne encore : `./start.sh --stop`, puis lancer `influencor-web`.
+
+Le contexte (domaine, ports, fichiers) est décrit dans [Web : app Flutter](./web-mi-kandra.md).
 
 ## Ce que fait `./start.sh`
 
@@ -13,10 +19,14 @@ flowchart TD
     A([./start.sh]) --> B{.env présent ?}
     B -- non --> B2[copie .env.example vers .env, permissions 600]
     B -- oui --> C
-    B2 --> C[lit INFLUENCOR_DOMAIN, par défaut influencor.mi-kandra.org]
+    B2 --> C[lit INFLUENCOR_DOMAIN, vide par défaut]
     C --> D{docker installé ?}
     D -- non --> X1([erreur : docker est requis])
-    D -- oui --> E{option}
+    D -- oui --> DG{option --stop / --status ?}
+    DG -- oui --> E{option}
+    DG -- non --> DD{INFLUENCOR_DOMAIN vide ou influencor.mi-kandra.org ?}
+    DD -- oui --> X0([erreur : domaine du site vitrine, app web non déployée])
+    DD -- non --> E
     E -->|"--stop"| E1[docker compose down] --> Z0([fin])
     E -->|"--status"| E2[état Mi Kandra puis sonde publique] --> Z0
     E -->|"--build"| E3{flutter installé ?}
@@ -84,4 +94,4 @@ La sonde du lien public utilise `scripts/edge/mi-kandra-dns.sh probe <domaine>`.
 | `nginx/templates/influencor.conf.template` | Vhost (HTTP vers HTTPS, cache, repli SPA). |
 | `nginx/certs/` | `fullchain.pem` et `privkey.pem` (jamais versionnés). |
 | `scripts/edge/` | Routeur partagé, sonde DNS, sauvegardes ; seul `project.env` diffère entre projets. |
-| `.env.example` | `INFLUENCOR_DOMAIN`, chemins des certificats. |
+| `.env.example` | `INFLUENCOR_DOMAIN` (vide par défaut), chemins des certificats. |

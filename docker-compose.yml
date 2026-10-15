@@ -1,6 +1,9 @@
 # =============================================================================
 # Influencor (web) — nginx d'origine Mi Kandra servant build/web.
 #
+# Plus déployée par défaut : influencor.mi-kandra.org sert le site vitrine
+# (dépôt influencor-web). Domaine à fixer dans .env (INFLUENCOR_DOMAIN).
+#
 # Le build se fait hors Docker :  ./start.sh --build   (flutter build web --release)
 # Cohabite avec Pôma / MGA sur un même serveur via scripts/edge (voir
 # docs/developer/deployment/web-mi-kandra.md). Seul ce nginx rejoint le réseau
@@ -40,13 +43,13 @@ services:
       org.mi-kandra.role: origin
       org.mi-kandra.project: influencor
       org.mi-kandra.origin-alias: influencor-origin
-      org.mi-kandra.domains: "${INFLUENCOR_DOMAIN:-influencor.mi-kandra.org}"
+      org.mi-kandra.domains: "${INFLUENCOR_DOMAIN:-}"
       org.mi-kandra.edge-capable: "1"
       org.mi-kandra.diag-http: "18084"
       org.mi-kandra.diag-https: "18447"
 
     environment:
-      INFLUENCOR_DOMAIN: ${INFLUENCOR_DOMAIN:-influencor.mi-kandra.org}
+      INFLUENCOR_DOMAIN: ${INFLUENCOR_DOMAIN:-}
       NGINX_ENVSUBST_FILTER: 'INFLUENCOR_|SSL_'
       SSL_CERT_PATH: ${SSL_CERT_PATH:-/etc/nginx/certs/fullchain.pem}
       SSL_KEY_PATH: ${SSL_KEY_PATH:-/etc/nginx/certs/privkey.pem}

@@ -2,7 +2,8 @@
 
 [← Documentation développeur](../README.md)
 
-> Site web: voir [Web: influencor.mi-kandra.org](./web-mi-kandra.md).
+> Site web : `influencor.mi-kandra.org` est servi par le dépôt `influencor-web` (site vitrine et
+> téléchargements). L'app web Flutter n'y est plus déployée : voir [Web : app Flutter](./web-mi-kandra.md).
 
 ## Android / Google Play
 

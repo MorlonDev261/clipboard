@@ -2,6 +2,10 @@
 # =============================================================================
 # start.sh — Influencor (web) sur un serveur Mi Kandra.
 #
+# Plus déployée par défaut : influencor.mi-kandra.org sert désormais le site vitrine
+# (dépôt influencor-web). Pour remettre l'app web Flutter en ligne, donnez-lui un autre
+# domaine dans .env (INFLUENCOR_DOMAIN). `--stop` reste utilisable pour l'arrêter.
+#
 #   ./start.sh            démarre nginx (sert build/web), cohabite avec les autres stacks
 #   ./start.sh --build    construit d'abord le site (flutter build web --release)
 #   ./start.sh --stop     arrête le conteneur
@@ -22,13 +26,26 @@ die() { printf 'Erreur : %s\n' "$*" >&2; exit 1; }
 env_value() { [ -f .env ] && sed -n "s/^$1=//p" .env | tail -n 1 | tr -d '"\r' || true; }
 
 [ -f .env ] || { cp .env.example .env && chmod 600 .env 2>/dev/null; echo "→ .env créé depuis .env.example (vérifiez-le)."; }
-DOMAIN=$(env_value INFLUENCOR_DOMAIN); DOMAIN=${DOMAIN:-influencor.mi-kandra.org}
+DOMAIN=$(env_value INFLUENCOR_DOMAIN)
+# Domaine désormais servi par le site vitrine (dépôt influencor-web).
+SITE_DOMAIN=influencor.mi-kandra.org
 
 command -v docker >/dev/null 2>&1 || die "docker est requis."
 
+# --stop / --status restent utilisables pour arrêter une ancienne instance.
+case "${1:-}" in
+  --stop|--status) : ;;
+  *) case "$DOMAIN" in
+       "")             die "INFLUENCOR_DOMAIN est vide dans .env : l'app web Flutter n'est plus déployée par défaut (voir l'en-tête de ce fichier)." ;;
+       "$SITE_DOMAIN") die "$SITE_DOMAIN sert désormais le site vitrine (dépôt influencor-web).
+  Pour arrêter l'app web Flutter : ./start.sh --stop
+  Pour la garder en ligne : donnez-lui un autre domaine dans .env (INFLUENCOR_DOMAIN)." ;;
+     esac ;;
+esac
+
 case "${1:-}" in
   --stop)   exec docker compose down ;;
-  --status) $EDGE status; exec sh scripts/edge/mi-kandra-dns.sh probe "$DOMAIN" ;;
+  --status) $EDGE status; [ -n "$DOMAIN" ] || exit 0; exec sh scripts/edge/mi-kandra-dns.sh probe "$DOMAIN" ;;
   --build)  command -v flutter >/dev/null 2>&1 || die "flutter est requis pour --build."
             flutter build web --release --no-wasm-dry-run ;;
   "") : ;;

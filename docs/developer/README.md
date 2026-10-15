@@ -18,7 +18,7 @@ préparer des releases.
 - [Builds](./build/builds.md)
 - [Signature et versioning](./release/signing-and-versioning.md)
 - [Publication](./deployment/publishing.md)
-- [Web: influencor.mi-kandra.org](./deployment/web-mi-kandra.md)
+- [Web : app Flutter (retirée de influencor.mi-kandra.org)](./deployment/web-mi-kandra.md)
 - [`start.sh` : étapes et commandes](./deployment/start-sh.md)
 - [Comptabilité, tâches et menu](./architecture/accounting-and-tasks.md)
 - [Degany, l'assistant IA (agent)](./architecture/assistant.md)
