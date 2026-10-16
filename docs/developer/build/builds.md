@@ -62,9 +62,17 @@ Sortie attendue si le build réussit:
 build/app/outputs/bundle/release/app-release.aab
 ```
 
-Problème connu: sur l'environnement Windows utilisé pendant le développement,
-ce build a déjà échoué sur le stripping des symboles natifs. Vérifier et corriger
-ce point avant publication Google Play.
+Les symboles de débogage du moteur Flutter et du code de l'app sont retirés
+des bibliothèques et rangés dans `BUNDLE-METADATA` de l'AAB. Seules les deux
+bibliothèques compilées par cargokit (`libsuper_native_extensions.so`,
+`libirondash_engine_context_native.so`) gardent leurs symboles (voir
+`packaging.jniLibs.keepDebugSymbols` dans `android/app/build.gradle.kts`).
+
+Flutter vérifie ce point avec `apkanalyzer`, fourni par le composant
+**Android SDK Command-line Tools**. Sans lui, `flutter build appbundle`
+affiche « failed to strip debug symbols » même quand l'AAB est correct :
+installer ce composant (Android Studio → SDK Manager → SDK Tools), puis
+`flutter doctor --android-licenses`.
 
 ## Windows release
 
@@ -145,8 +153,14 @@ Commande de collecte:
 powershell -ExecutionPolicy Bypass -File tools/collect_release_artifacts.ps1
 ```
 
-Commande complète recommandée:
+Commande complète recommandée (Windows, APK par ABI, APK universel, AAB, web):
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File tools/build_full_release.ps1
+```
+
+Android et Windows seulement:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools/build_full_release.ps1 -SkipWeb
 ```

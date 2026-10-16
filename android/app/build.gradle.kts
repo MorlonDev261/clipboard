@@ -87,8 +87,15 @@ android {
         jniLibs {
             // Native plugins are built locally by cargokit. On this Windows SDK
             // setup, app bundle generation can fail while stripping their
-            // symbols even though the binaries are otherwise valid.
-            keepDebugSymbols += listOf("**/*.so")
+            // symbols even though the binaries are otherwise valid. Only
+            // those are kept as is: the Flutter engine, the app code and the
+            // other libraries must be stripped (otherwise ~140 MB of debug
+            // symbols per ABI ship to users, and `flutter build appbundle`
+            // refuses the bundle).
+            keepDebugSymbols += listOf(
+                "**/libsuper_native_extensions.so",
+                "**/libirondash_engine_context_native.so",
+            )
         }
     }
 }
