@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:clipboard/features/cleaner/data/stale_copies.dart';
+import 'package:influencor/features/cleaner/data/stale_copies.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 

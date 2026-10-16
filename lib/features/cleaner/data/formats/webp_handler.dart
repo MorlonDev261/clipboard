@@ -99,7 +99,7 @@ class WebpHandler extends ByteFormatHandler {
     if (out != null) {
       final hasVp8x = keep.any((c) => c.type == 'VP8X');
       final exifOrientation = hasVp8x &&
-              options.preserveOrientation &&
+              options.keepOrientationFlag &&
               orientation != null &&
               orientation > 1
           ? orientation

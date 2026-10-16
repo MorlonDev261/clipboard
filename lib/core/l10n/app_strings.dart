@@ -25,24 +25,218 @@ class AppStrings {
   String get settings => _t('Réglages', 'Settings', mg: 'Parametra');
   String get favorites => _t('Favoris', 'Favorites', mg: 'Tiana');
   String get library => _t('Bibliothèque', 'Library', mg: 'Tahiry');
-  String get assistant => _t('Assistant', 'Assistant');
+
+  /// The AI agent's name (tab, chat, settings).
+  String get assistant => 'Degany';
 
   // Assistant (chat)
   String get assistantIntro => _t(
-        'Posez une question ou décrivez ce que vous cherchez.',
-        'Ask a question or describe what you are looking for.',
-        mg: 'Mametraha fanontaniana na soraty izay tadiavinao.',
+        'Demandez-moi de chercher, ranger, créer des notes ou des tableaux, '
+            'nettoyer des photos avec Deganeo, gérer vos tâches et votre '
+            'comptabilité…',
+        'Ask me to search, organise, write notes or tables, clean photos with '
+            'Deganeo, manage your tasks and accounting…',
+        mg: 'Angataho aho hikaroka, handamina, hanoratra naoty na tabilao, '
+            'hanadio sary amin\'ny Deganeo, hitantana ny asa sy ny kaonty…',
       );
   String get assistantHint =>
       _t('Écrivez un message…', 'Write a message…', mg: 'Manorata hafatra…');
-  String get assistantComingSoon => _t(
-        "L'assistant arrive bientôt : cette conversation n'est pas encore "
-            'connectée à un service.',
-        'The assistant is coming soon: this conversation is not connected to a '
-            'service yet.',
-        mg: 'Ho avy tsy ho ela ny assistant: mbola tsy mifandray amin\'ny '
-            'service ity resaka ity.',
+  String get assistantNotConfigured => _t(
+        'Connectez votre IA préférée (ChatGPT, Claude, Gemini, DeepSeek…) '
+            'avec votre propre clé API pour activer Degany.',
+        'Connect your favourite AI (ChatGPT, Claude, Gemini, DeepSeek…) with '
+            'your own API key to enable Degany.',
+        mg: 'Ampifandraiso ny IA tianao (ChatGPT, Claude, Gemini, DeepSeek…) '
+            'amin\'ny lakile API anao.',
       );
+  String get assistantConnect =>
+      _t('Connecter une IA', 'Connect an AI', mg: 'Hampifandray IA');
+  String get assistantSettings =>
+      _t('Degany (IA)', 'Degany (AI)', mg: 'Degany (IA)');
+  String get assistantSettingsHint => _t(
+        'Fournisseur, clé API, modèle',
+        'Provider, API key, model',
+        mg: 'Mpamatsy, lakile API, modely',
+      );
+  String get newConversation =>
+      _t('Nouvelle conversation', 'New conversation', mg: 'Resaka vaovao');
+  String get stop => _t('Arrêter', 'Stop', mg: 'Atsaharo');
+  String get thinking => _t('Réflexion', 'Thinking', mg: 'Fisainana');
+  String get attach => _t('Joindre', 'Attach', mg: 'Ampiarahina');
+  String get attachMedia =>
+      _t('Photos et vidéos', 'Photos and videos', mg: 'Sary sy horonan-tsary');
+  String get attachFiles => _t('Fichiers', 'Files', mg: 'Rakitra');
+  String get answerHint =>
+      _t('Votre réponse…', 'Your answer…', mg: 'Ny valinao…');
+  String get attachedFiles =>
+      _t('Fichiers joints', 'Attached files', mg: 'Rakitra miaraka');
+
+  // Degany — messages and errors
+  String get deganyNotConfigured => _t(
+        "Connectez d'abord un modèle d'IA dans les réglages de Degany "
+            '(fournisseur, clé API, modèle).',
+        'First connect an AI model in Degany’s settings (provider, API key, '
+            'model).',
+        mg: 'Ampifandraiso aloha ny modely IA ao amin’ny parametr’i Degany '
+            '(mpamatsy, lakile API, modely).',
+      );
+  String get deganyTooManySteps => _t(
+        "Arrêt : trop d'étapes pour une seule demande. Envoyez « continue » "
+            'pour poursuivre.',
+        'Stopped: too many steps for one request. Send “continue” to go on.',
+        mg: 'Nijanona: be loatra ny dingana. Alefaso « continue » raha hanohy.',
+      );
+  String get deganyRefused => _t(
+        'Le modèle a refusé de traiter cette demande. Reformulez-la ou '
+            'essayez un autre modèle.',
+        'The model declined this request. Rephrase it or try another model.',
+        mg: 'Nolavin’ny modely ity fangatahana ity. Avereno amin’ny teny hafa '
+            'na andramo modely hafa.',
+      );
+  String get deganyStopped => _t('Arrêté.', 'Stopped.', mg: 'Natsahatra.');
+  String deganyError(Object e) =>
+      _t('Erreur : $e', 'Error: $e', mg: 'Hadisoana: $e');
+  String get deganyContextTrimmed => _t(
+        'Conversation longue : les plus anciens échanges ne sont plus envoyés '
+            'au modèle.',
+        'Long conversation: the oldest exchanges are no longer sent to the '
+            'model.',
+        mg: 'Resaka lava: tsy alefa amin’ny modely intsony ny fifanakalozana '
+            'taloha indrindra.',
+      );
+  String get llmTimeout => _t('Le service ne répond pas (délai dépassé).',
+      'The service is not responding (timed out).',
+      mg: 'Tsy mamaly ny service (lany fotoana).');
+  String llmConnection(String detail) =>
+      _t('Connexion impossible : $detail', 'Cannot connect: $detail',
+          mg: 'Tsy afaka mifandray: $detail');
+  String llmInterrupted(String detail) =>
+      _t('Connexion interrompue : $detail', 'Connection lost: $detail',
+          mg: 'Tapaka ny fifandraisana: $detail');
+  String get llmStalled => _t('Le service a cessé de répondre (délai dépassé).',
+      'The service stopped responding (timed out).',
+      mg: 'Nitsahatra namaly ny service (lany fotoana).');
+  String get llmEmptyReply =>
+      _t('Réponse vide du modèle.', 'Empty reply from the model.',
+          mg: 'Valiny foana avy amin’ny modely.');
+  String get llmUnexpectedReply =>
+      _t('Réponse inattendue du service.', 'Unexpected reply from the service.',
+          mg: 'Valiny tsy nampoizina avy amin’ny service.');
+  String get llmServiceError =>
+      _t('Erreur du service.', 'Service error.', mg: 'Hadisoan’ny service.');
+  String get llmHintAuth => _t(
+      'Vérifiez la clé API dans les réglages de Degany.',
+      'Check the API key in Degany’s settings.',
+      mg: 'Hamarino ny lakile API ao amin’ny parametr’i Degany.');
+  String get llmHintNotFound => _t(
+      'Vérifiez le nom du modèle et l’adresse du service.',
+      'Check the model name and the service URL.',
+      mg: 'Hamarino ny anaran’ny modely sy ny adiresin’ny service.');
+  String get llmHintRateLimit => _t(
+      'Quota ou limite de débit atteint : réessayez plus tard.',
+      'Quota or rate limit reached: try again later.',
+      mg: 'Tratra ny fetra: andramo indray any aoriana.');
+
+  // Degany — one-line action results
+  String toolResults(Object? n) =>
+      _t('$n résultat(s)', '$n result(s)', mg: 'Valiny $n');
+  String toolItems(Object? n) =>
+      _t('$n élément(s)', '$n item(s)', mg: 'Singa $n');
+  String toolFields(Object? n) => _t('$n champ(s)', '$n field(s)', mg: '$n');
+  String get toolCreated => _t('Créé', 'Created', mg: 'Noforonina');
+  String get toolSaved => _t('Enregistré', 'Saved', mg: 'Voatahiry');
+  String get toolRenamed => _t('Renommé', 'Renamed', mg: 'Novana anarana');
+  String get toolCopy => _t('Copie', 'Copy', mg: 'Dika');
+  String get toolOpened => _t('Ouvert', 'Opened', mg: 'Nosokafana');
+  String get toolDeleted => _t('Supprimé', 'Deleted', mg: 'Voafafa');
+  String get toolDenied => _t('Refusé', 'Denied', mg: 'Nolavina');
+  String toolMoved(Object? n) =>
+      _t('$n déplacé(s)', '$n moved', mg: '$n nafindra');
+  String toolTrashed(Object? n) =>
+      _t('$n à la corbeille', '$n moved to trash', mg: '$n tany am-pako');
+  String toolRestored(Object? n) =>
+      _t('$n restauré(s)', '$n restored', mg: '$n naverina');
+  String toolImported(Object? n) =>
+      _t('$n importé(s)', '$n imported', mg: '$n nampidirina');
+  String toolSettingsChanged(Object? n) =>
+      _t('$n réglage(s) modifié(s)', '$n setting(s) changed',
+          mg: 'Parametra $n novaina');
+  String toolSensitive(Object? n) =>
+      _t('$n métadonnée(s) sensible(s)', '$n sensitive metadata item(s)',
+          mg: 'Metadata saro-pady $n');
+  String toolCharacters(Object? n) =>
+      _t('$n caractères', '$n characters', mg: 'Litera $n');
+  String toolRows(Object? n) =>
+      _t('$n ligne(s)', '$n row(s)', mg: 'Andalana $n');
+  String toolNet(Object? n) =>
+      _t('Résultat net : $n Ar', 'Net result: $n Ar', mg: 'Vokatra: $n Ar');
+  String toolCheapest(Object? op, Object? fee) =>
+      _t('Le moins cher : $op ($fee Ar)', 'Cheapest: $op ($fee Ar)',
+          mg: 'Mora indrindra: $op ($fee Ar)');
+  String get assistantWorking =>
+      _t('Je travaille…', 'Working…', mg: 'Miasa aho…');
+  String get llmProvider => _t('Fournisseur', 'Provider', mg: 'Mpamatsy');
+  String get apiKey => _t('Clé API', 'API key', mg: 'Lakile API');
+  String get apiKeyLocal => _t(
+        'Enregistrée uniquement sur cet appareil. Les messages sont envoyés '
+            'directement au fournisseur choisi.',
+        'Stored on this device only. Messages go straight to the chosen '
+            'provider.',
+        mg: 'Voatahiry eto amin\'ity fitaovana ity ihany.',
+      );
+  String get getApiKey => _t('Obtenir une clé', 'Get a key', mg: 'Haka lakile');
+  String get llmModel => _t('Modèle', 'Model', mg: 'Modely');
+  String get llmBaseUrl =>
+      _t('Adresse du service', 'Service URL', mg: 'Adiresin\'ny service');
+  String get llmBaseUrlHint => _t(
+        'Laisser vide pour l’adresse par défaut',
+        'Leave empty for the default URL',
+        mg: 'Avelao ho foana raha adiresy mahazatra',
+      );
+  String get loadModels =>
+      _t('Charger les modèles', 'Load models', mg: 'Hampiditra modely');
+  String get testConnection => _t('Tester la connexion', 'Test connection',
+      mg: 'Andramo ny fifandraisana');
+  String get connectionOk =>
+      _t('Connexion réussie ✓', 'Connection works ✓', mg: 'Mandeha ✓');
+  String get confirmDestructive => _t(
+        'Demander avant de supprimer ou remplacer',
+        'Ask before deleting or replacing',
+        mg: 'Manontany alohan\'ny hamafana',
+      );
+  String get confirmDestructiveHint => _t(
+        'Corbeille, suppression définitive, remplacement d’un original…',
+        'Trash, permanent deletion, replacing an original…',
+        mg: 'Fako, famafana tanteraka…',
+      );
+  String get allow => _t('Autoriser', 'Allow', mg: 'Avela');
+  String get deny => _t('Refuser', 'Deny', mg: 'Lavina');
+  String get copyPath =>
+      _t('Copier le chemin', 'Copy path', mg: 'Adikao ny lalana');
+  String get pathCopied =>
+      _t('Chemin copié', 'Path copied', mg: 'Voadika ny lalana');
+  String get itemNotFound =>
+      _t('Élément introuvable', 'Item not found', mg: 'Tsy hita');
+  List<String> get assistantSuggestions => _isEn
+      ? const [
+          'What is in my library?',
+          'Find my notes about prices',
+          'Clean the metadata of my latest photos',
+          'This month’s accounting summary',
+        ]
+      : _isMg
+          ? const [
+              'Inona no ao amin\'ny tahiriko?',
+              'Tadiavo ny naoty momba ny vidiny',
+              'Diovy ny metadata amin\'ny sary farany',
+              'Tatitra kaonty amin\'ity volana ity',
+            ]
+          : const [
+              'Qu’y a-t-il dans ma bibliothèque ?',
+              'Trouve mes notes sur les prix',
+              'Nettoie les métadonnées de mes dernières photos',
+              'Bilan comptable de ce mois',
+            ];
   String get removeExif => _t('Deganeo', 'Deganeo', mg: 'Deganeo');
   String get cleanMediaCta => _t(
         'Nettoyer pour publier',
@@ -53,6 +247,62 @@ class AppStrings {
         'Choisir un autre fichier',
         'Choose another file',
         mg: 'Misafidiana rakitra hafa',
+      );
+
+  // Deganeo — multi-file queue
+  String get addFiles =>
+      _t('Ajouter des fichiers', 'Add files', mg: 'Hanampy rakitra');
+  String get cleanAll => _t('Tout nettoyer', 'Clean all', mg: 'Diovy daholo');
+  String get downloadAll =>
+      _t('Tout télécharger', 'Download all', mg: 'Alaina daholo');
+  String get removeFromList => _t('Retirer de la liste', 'Remove from list',
+      mg: "Esory amin'ny lisitra");
+  String get searchMetadata =>
+      _t('Rechercher une balise (GPS, Date…)', 'Search a tag (GPS, Date…)',
+          mg: 'Karohy tag (GPS, Daty…)');
+  String get inspectingFile =>
+      _t('Lecture des métadonnées…', 'Reading metadata…',
+          mg: 'Famakiana ny metadata…');
+  String get noMetadataFound => _t(
+      'Aucune métadonnée sensible détectée.', 'No sensitive metadata detected.',
+      mg: 'Tsy hita metadata saro-pady.');
+  String metadataFoundCount(int n) => _t(
+        '$n métadonnée(s) détectée(s)',
+        '$n metadata item(s) found',
+        mg: 'Metadata hita: $n',
+      );
+  String tooManyFiles(int max) => _t(
+        'Maximum $max fichiers à la fois : les suivants ont été ignorés.',
+        'Maximum $max files at a time: the rest were ignored.',
+        mg: 'Rakitra $max no azo ampiasaina indray mandeha: nafoy ny sisa.',
+      );
+  String filesSaved(int n) => _t(
+        '$n fichier(s) enregistré(s)',
+        '$n file(s) saved',
+        mg: 'Rakitra voatahiry: $n',
+      );
+  String get chooseDestinationFolder =>
+      _t('Choisir le dossier de destination', 'Choose the destination folder',
+          mg: 'Misafidiana ny lahatahiry');
+
+  // Deganeo — library flow (one image at a time)
+  String get deganeoReplaceOriginal => _t(
+        "Remplacer l'original",
+        'Replace original',
+        mg: 'Soloina ny tany am-boalohany',
+      );
+  String get deganeoKeepCopy =>
+      _t('Garder une copie', 'Keep a copy', mg: 'Tehirizo kopia');
+  String get deganeoSkip => _t('Ignorer', 'Skip', mg: 'Avelao');
+  String deganeoProgress(int i, int n) => _t(
+        'Image $i sur $n',
+        'Image $i of $n',
+        mg: "Sary $i amin'ny $n",
+      );
+  String deganeoSummary(int replaced, int copied) => _t(
+        '$replaced remplacée(s), $copied copie(s) créée(s)',
+        '$replaced replaced, $copied copy(ies) created',
+        mg: 'Voasolo: $replaced, kopia noforonina: $copied',
       );
 
   // Metadata cleaner report
@@ -234,6 +484,17 @@ class AppStrings {
             mg: 'Notehirizina ny rakitra miaraka (endri-tsoratra, sary) '
                 'satria mety miankina aminy ny subtitle.',
           ),
+        CleanCaveat.orientationFlagKept => _t(
+            'La rotation n’a pas pu être appliquée aux pixels de cette photo : '
+                'un indicateur d’orientation minimal, sans donnée personnelle, '
+                'est conservé pour qu’elle ne s’affiche pas de travers.',
+            'The rotation could not be applied to this photo’s pixels: a '
+                'minimal orientation flag, with no personal data, is kept so '
+                'it does not show up sideways.',
+            mg: 'Tsy afaka nampiharina tamin’ny pixel ny fihodinana: '
+                'notehirizina ny marika fitodika kely indrindra, tsy misy '
+                'angona manokana, mba tsy hiolakolaka ny sary.',
+          ),
       };
 
   // About page & reseller access
@@ -316,14 +577,17 @@ class AppStrings {
             'mpamorona, fanamarihana.',
       );
   String get aboutFeatureAssistantTitle =>
-      _t('Assistant (bientôt)', 'Assistant (coming soon)',
-          mg: 'Assistant (tsy ho ela)');
+      _t('Degany, votre IA', 'Degany, your AI', mg: 'Degany, IA-nao');
   String get aboutFeatureAssistantBody => _t(
-        'Un assistant pour vous aider à préparer vos contenus arrive '
-            'prochainement.',
-        'An assistant to help you prepare your content is coming soon.',
-        mg: 'Assistant hanampy anao hanomana ny votoatinao dia ho avy tsy '
-            'ho ela.',
+        'Connectez l’IA de votre choix (ChatGPT, Claude, Gemini, '
+            'DeepSeek…) : Degany cherche, range, écrit vos notes, nettoie '
+            'vos photos avec Deganeo et gère tâches et comptabilité.',
+        'Connect the AI of your choice (ChatGPT, Claude, Gemini, '
+            'DeepSeek…): Degany searches, organises, writes your notes, '
+            'cleans your photos with Deganeo and manages tasks and accounting.',
+        mg: 'Ampifandraiso ny IA tianao (ChatGPT, Claude, Gemini, '
+            'DeepSeek…): Degany mikaroka, mandamina, manoratra naoty, '
+            'manadio sary amin\'ny Deganeo ary mitantana asa sy kaonty.',
       );
   String get aboutPrivacyTitle =>
       _t('Vos données restent chez vous', 'Your data stays with you',
@@ -465,6 +729,107 @@ class AppStrings {
   String get create => _t('Créer', 'Create', mg: 'Forony');
   String get save => _t('Enregistrer', 'Save', mg: 'Tehirizo');
   String get edit => _t('Modifier', 'Edit', mg: 'Ovay');
+  String get fees =>
+      _t('Frais mobile money', 'Mobile money fees', mg: 'Sarany mobile money');
+  String get feeWithdraw => _t('Retrait', 'Withdrawal', mg: 'Fanesorana');
+  String get feeTransfer => _t('Transfert', 'Transfer', mg: 'Famindrana');
+  String get feeOperator => _t('Opérateur', 'Operator', mg: 'Operatera');
+  String get feeTo => _t('Vers', 'To', mg: 'Mankany');
+  String get feeChannelUssd => _t('USSD #144#', 'USSD #144#', mg: 'USSD #144#');
+  String get feeChannelApp =>
+      _t('Appli (−50 %)', 'App (−50%)', mg: 'Appli (−50 %)');
+  String get feeEstimated => _t(
+      'Airtel : grille non publiée, tarifs estimés (comme Orange).',
+      'Airtel: grid not published, tariffs estimated (same as Orange).',
+      mg: 'Airtel: tsy navoaka ny sarany, tombanana (mitovy amin\'ny Orange).');
+  String get feeBest =>
+      _t('Le plus économique', 'Cheapest', mg: 'Mora indrindra');
+  String get feeDirect => _t('Direct', 'Direct', mg: 'Mivantana');
+  String get feeSplit => _t('Séparé', 'Split', mg: 'Zarazara');
+  String get feeTotal => _t('Frais', 'Fees', mg: 'Sarany');
+  String get feeNoPlan => _t('Montant non couvert par ces tarifs',
+      'Amount not covered by these tariffs',
+      mg: 'Tsy ampy ireo sarany ireo ny vola');
+  String get feeTariffs => _t('Tarifs mobile money', 'Mobile money tariffs',
+      mg: 'Sarany mobile money');
+  String get feeTariffsHint => _t(
+      'Modifier les grilles de frais ou ajouter un opérateur',
+      'Edit fee grids or add an operator',
+      mg: 'Ovay ny sarany na ampio operatera');
+  String get feeAddOperator =>
+      _t('Ajouter un opérateur', 'Add an operator', mg: 'Ampio operatera');
+  String get feeOperatorName =>
+      _t('Nom de l’opérateur', 'Operator name', mg: 'Anaran’ny operatera');
+  String get feeTabWithdraw => _t('Retrait', 'Withdraw', mg: 'Esory');
+  String get feeTabSame => _t('Même', 'Same', mg: 'Mitovy');
+  String get feeTabOther => _t('Autre', 'Other', mg: 'Hafa');
+  String get feeTabApp => _t('Appli', 'App', mg: 'Appli');
+  String get feeGridWithdraw => _t('Retrait', 'Withdrawal', mg: 'Fanesorana');
+  String get feeGridSame =>
+      _t('Transfert : même opérateur', 'Transfer: same operator',
+          mg: 'Famindrana: mitovy operatera');
+  String get feeGridOther =>
+      _t('Transfert : autre opérateur', 'Transfer: other operator',
+          mg: 'Famindrana: operatera hafa');
+  String get feeGridApp => _t('Transfert via l’appli', 'Transfer via app',
+      mg: 'Famindrana amin’ny appli');
+  String example(String v) => _t('Ex : $v', 'e.g. $v', mg: 'Ohatra: $v');
+  String get feeEstimatedTag => _t('estimé', 'estimated', mg: 'tombanana');
+  String get feeRestoreOfficial =>
+      _t('Revenir au tarif officiel', 'Back to the official tariff',
+          mg: 'Hiverina amin’ny sarany ofisialy');
+  String get feeRestoreOfficialConfirm => _t(
+      'Vos modifications de cet opérateur seront remplacées par la grille fournie avec l’app.',
+      'Your changes to this operator will be replaced by the grid shipped with the app.',
+      mg: 'Soloina ny fanovanao amin’ity operatera ity.');
+  String get feeAddBracket =>
+      _t('Ajouter une tranche', 'Add a bracket', mg: 'Ampio sokajy');
+  String get feeBracketFrom =>
+      _t('De (Ar)', 'From (Ar)', mg: 'Hatramin’ny (Ar)');
+  String get feeBracketTo => _t('À (Ar)', 'To (Ar)', mg: 'Hatramin’ny (Ar)');
+  String get feeBracketFee => _t('Frais (Ar)', 'Fee (Ar)', mg: 'Sarany (Ar)');
+  String get feeBracketInvalid => _t(
+      'Vérifiez : « De » doit être ≤ « À », frais ≥ 0.',
+      'Check: "From" must be ≤ "To", fee ≥ 0.',
+      mg: 'Hamarino: "Hatramin’ny" ≤ "Hatramin’ny", sarany ≥ 0.');
+  String get feeBracketOverlap =>
+      _t('Des tranches se chevauchent.', 'Some brackets overlap.',
+          mg: 'Misy sokajy mifandona.');
+  String get feeGridEmpty =>
+      _t('Aucune tranche', 'No brackets yet', mg: 'Tsy mbola misy sokajy');
+  String get feeGridOptional => _t(
+      'Facultatif : vide = grille « même opérateur ».',
+      'Optional: empty = "same operator" grid.',
+      mg: 'Tsy voatery: foana = grille mitovy operatera.');
+  String get feeVerifiedSwitch =>
+      _t('Tarif vérifié (officiel)', 'Verified (official) tariff',
+          mg: 'Sarany voamarina');
+  String get feeResetDefaults =>
+      _t('Rétablir les tarifs par défaut', 'Restore default tariffs',
+          mg: 'Averina ny sarany voalohany');
+  String get feeResetConfirm => _t(
+      'Remplacer tous vos tarifs par ceux fournis avec l’app ?',
+      'Replace all your tariffs with the ones shipped with the app?',
+      mg: 'Soloina ny sarany rehetra amin’ny avy amin’ny app?');
+  String get feeDeleteOperator =>
+      _t('Supprimer cet opérateur ?', 'Delete this operator?',
+          mg: 'Fafana ity operatera ity?');
+  String get feeNameTaken =>
+      _t('Ce nom existe déjà.', 'This name already exists.',
+          mg: 'Efa misy io anarana io.');
+  String get feeNeedGrids => _t(
+      'Retrait et transfert (même opérateur) doivent avoir au moins une tranche.',
+      'Withdrawal and same-operator transfer need at least one bracket.',
+      mg: 'Ilaina ny sokajy iray farafahakeliny.');
+  String get feeUnverified => _t(
+      'Grilles officielles MVola et Orange (Orange : en vigueur depuis févr. 2025). À confirmer avant une grosse opération.',
+      'Official MVola and Orange grids (Orange: in force since Feb 2025). Confirm before large operations.',
+      mg: 'Sarany ofisialy MVola sy Orange. Hamarino alohan\'ny asa lehibe.');
+  String feeSaves(String v) =>
+      _t('Économie : $v', 'You save: $v', mg: 'Voatahiry: $v');
+  String feeOps(int n) =>
+      _t('$n opérations', '$n operations', mg: 'fampiasana $n');
+  String get closeAction => _t('Fermer', 'Close', mg: 'Akatona');
   String get refresh => _t('Actualiser', 'Refresh', mg: 'Havaozy');
   String get more => _t('Plus', 'More', mg: 'Bebe kokoa');
 
@@ -565,6 +930,19 @@ class AppStrings {
       'Ce fichier JSON n’est pas un tableau compatible.',
       'This JSON file is not a compatible table.',
       mg: 'Ity rakitra JSON ity dia tsy tabilao mifanaraka.');
+  String get showHiddenColumns =>
+      _t('Afficher les colonnes masquées', 'Show hidden columns',
+          mg: 'Asehoy ireo tsanganana nafenina');
+  String get hideHiddenColumns =>
+      _t('Masquer les colonnes masquées', 'Hide masked columns',
+          mg: 'Afeno ireo tsanganana');
+  String get allColumnsHidden => _t('Toutes les colonnes sont masquées ([...])',
+      'All columns are hidden ([...])',
+      mg: 'Nafenina daholo ny tsanganana rehetra ([...])');
+  String get longPressToToggleColumns => _t(
+      'Appui long sur Modifier pour afficher / masquer',
+      'Long press on Edit to show / hide',
+      mg: 'Tsindrio ela ny Hanova hanehoana / hanafenana');
 
   // Rich-text formatting toolbar
   String get bold => _t('Gras', 'Bold', mg: 'Matevina');
@@ -847,6 +1225,63 @@ class AppStrings {
   String nDeleted(int n) =>
       _t('$n élément(s) supprimé(s)', '$n item(s) deleted',
           mg: '$n zavatra voafafa');
+
+  // Menu / accounting / tasks
+  String get menu => _t('Menu', 'Menu', mg: 'Menio');
+  String get accounting => _t('Comptabilité', 'Accounting', mg: 'Kaonty');
+  String get tasks => _t('Tâches', 'Tasks', mg: 'Andraikitra');
+  String get editMode => _t('Mode édition', 'Edit mode', mg: 'Fomba fanovana');
+  String get normalMode =>
+      _t('Mode normal', 'Normal mode', mg: 'Fomba mahazatra');
+  String get availableBalance =>
+      _t('Solde disponible', 'Available balance', mg: 'Sola misy');
+  String get credit => _t('Crédit', 'Credit', mg: 'Fidirana');
+  String get debit => _t('Débit', 'Debit', mg: 'Fanindraham-bola');
+  String get purchase => _t('Achat', 'Purchase', mg: 'Fividianana');
+  String get sale => _t('Vente', 'Sale', mg: 'Varotra');
+  String get expense => _t('Dépense', 'Expense', mg: 'Lany');
+  String get account => _t('Compte', 'Account', mg: 'Kaonty');
+  String get cash => _t('Espèces (Cash)', 'Cash', mg: 'Vola ao am-paosy');
+  String get amount => _t('Montant', 'Amount', mg: 'Habetsahana');
+  String get date => _t('Date', 'Date', mg: 'Daty');
+  String get note => _t('Note', 'Note', mg: 'Naoty');
+  String get type => _t('Type', 'Type', mg: 'Karazana');
+  String get newTransaction =>
+      _t('Nouvelle opération', 'New transaction', mg: 'Fihetsika vaovao');
+  String get editTransaction =>
+      _t("Modifier l'opération", 'Edit transaction', mg: 'Ovay ny fihetsika');
+  String get noTransactions =>
+      _t('Aucune opération pour le moment', 'No transactions yet',
+          mg: 'Tsy mbola misy fihetsika');
+  String get invalidAmount =>
+      _t('Montant invalide', 'Invalid amount', mg: 'Tsy mety ny habetsahana');
+  String get newTask =>
+      _t('Nouvelle tâche', 'New task', mg: 'Andraikitra vaovao');
+  String get noTasks => _t('Aucune tâche pour le moment', 'No tasks yet',
+      mg: 'Tsy mbola misy andraikitra');
+  String get taskTitle => _t('Titre', 'Title', mg: 'Lohateny');
+  String get untitledTask => _t('Tâche sans titre', 'Untitled task',
+      mg: 'Andraikitra tsy misy anarana');
+  String get addTextBlock =>
+      _t('Bloc de texte', 'Text block', mg: 'Sakana lahatsoratra');
+  String get addChecklist =>
+      _t('Checklist', 'Checklist', mg: 'Lisitra fanamarinana');
+  String get addItem =>
+      _t('Ajouter un élément', 'Add item', mg: 'Hampiana zavatra');
+  String get textHint => _t('Écrivez ici…', 'Write here…', mg: 'Soraty eto…');
+  String get checklistTitleHint =>
+      _t('Titre de la checklist', 'Checklist title',
+          mg: 'Lohatenin\'ny lisitra');
+  String get itemHint => _t('Élément', 'Item', mg: 'Zavatra');
+  String get deleteTaskQuestion =>
+      _t('Supprimer cette tâche ?', 'Delete this task?',
+          mg: 'Fafana ve ity andraikitra ity?');
+  String get deleteBlock =>
+      _t('Supprimer le bloc', 'Delete block', mg: 'Fafao ny sakana');
+  String get needWorkspace => _t(
+      "Choisissez d'abord un dossier de travail (Accueil).",
+      'Choose a workspace folder first (Home).',
+      mg: 'Misafidiana laharana ho an\'ny asa aloha (Fandraisana).');
 }
 
 /// Current app strings, following the concrete language chosen in settings.

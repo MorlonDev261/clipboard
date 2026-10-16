@@ -3,6 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../features/about/presentation/about_screen.dart';
+import '../features/accounting/presentation/accounting_screen.dart';
+import '../features/fees/presentation/fees_screen.dart';
+import '../features/menu/presentation/menu_screen.dart';
+import '../features/tasks/presentation/task_editor_screen.dart';
+import '../features/tasks/presentation/tasks_screen.dart';
 import '../features/assistant/presentation/assistant_screen.dart';
 import '../features/favorites/presentation/favorites_screen.dart';
 import '../features/home/presentation/home_screen.dart';
@@ -100,6 +105,30 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const TrashScreen(),
           ),
           GoRoute(
+            path: '/menu',
+            builder: (context, state) => const MenuScreen(),
+          ),
+          GoRoute(
+            path: '/accounting',
+            builder: (context, state) => const AccountingScreen(),
+          ),
+          GoRoute(
+            path: '/fees',
+            builder: (context, state) => const FeesScreen(),
+          ),
+          GoRoute(
+            path: '/task',
+            builder: (context, state) => const TasksScreen(),
+          ),
+          GoRoute(
+            path: '/task/edit',
+            builder: (context, state) {
+              final id = state.uri.queryParameters['id'];
+              if (id == null) return const TasksScreen();
+              return TaskEditorScreen(taskId: id);
+            },
+          ),
+          GoRoute(
             path: '/settings',
             builder: (context, state) => const SettingsScreen(),
           ),
@@ -122,7 +151,9 @@ CustomTransitionPage<void> _assistantPage(
   Widget child,
 ) {
   return CustomTransitionPage<void>(
-    key: state.pageKey,
+    // One shared key: Assistant <-> Deganeo is a swipe inside the same page,
+    // not a navigation, so the state (chat, Deganeo queue) is kept.
+    key: const ValueKey('assistant-shell'),
     child: child,
     transitionDuration: const Duration(milliseconds: 260),
     reverseTransitionDuration: const Duration(milliseconds: 220),

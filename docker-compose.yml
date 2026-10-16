@@ -1,0 +1,80 @@
+# =============================================================================
+# Influencor (web) — nginx d'origine Mi Kandra servant build/web.
+#
+# Plus déployée par défaut : influencor.mi-kandra.org sert le site vitrine
+# (dépôt influencor-web). Domaine à fixer dans .env (INFLUENCOR_DOMAIN).
+#
+# Le build se fait hors Docker :  ./start.sh --build   (flutter build web --release)
+# Cohabite avec Pôma / MGA sur un même serveur via scripts/edge (voir
+# docs/developer/deployment/web-mi-kandra.md). Seul ce nginx rejoint le réseau
+# partagé « mi-kandra-edge ».
+# =============================================================================
+name: influencor
+
+services:
+  nginx:
+    image: nginx:1.27.5-alpine
+    container_name: influencor-nginx
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+      - NET_BIND_SERVICE
+    pids_limit: 256
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx
+      - /var/run
+      - /tmp
+      - /etc/nginx/conf.d
+
+    # 80/443 sur l'hôte en mode autonome ; en mode partagé,
+    # `scripts/edge/mi-kandra-edge.sh env` les redirige vers un port loopback.
+    ports:
+      - "${MI_KANDRA_HTTP_PUBLISH:-80:80}"
+      - "${MI_KANDRA_HTTPS_PUBLISH:-443:443}"
+
+    labels:
+      org.mi-kandra.role: origin
+      org.mi-kandra.project: influencor
+      org.mi-kandra.origin-alias: influencor-origin
+      org.mi-kandra.domains: "${INFLUENCOR_DOMAIN:-}"
+      org.mi-kandra.edge-capable: "1"
+      org.mi-kandra.diag-http: "18084"
+      org.mi-kandra.diag-https: "18447"
+
+    environment:
+      INFLUENCOR_DOMAIN: ${INFLUENCOR_DOMAIN:-}
+      NGINX_ENVSUBST_FILTER: 'INFLUENCOR_|SSL_'
+      SSL_CERT_PATH: ${SSL_CERT_PATH:-/etc/nginx/certs/fullchain.pem}
+      SSL_KEY_PATH: ${SSL_KEY_PATH:-/etc/nginx/certs/privkey.pem}
+
+    volumes:
+      - ./build/web:/usr/share/nginx/html:ro
+      - ./nginx/templates:/etc/nginx/templates:ro
+      - ./nginx/snippets:/etc/nginx/snippets:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/healthz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+    networks:
+      default: {}
+      mi-kandra-edge:
+        aliases:
+          - influencor-origin
+
+networks:
+  # Partagé avec les autres stacks Mi Kandra (voir scripts/edge/). Compose affiche un
+  # avertissement bénin quand le réseau a été créé par un autre projet.
+  mi-kandra-edge:
+    name: mi-kandra-edge

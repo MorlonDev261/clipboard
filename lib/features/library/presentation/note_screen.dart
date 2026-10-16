@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:path/path.dart' as p;
 
+import '../../../core/widgets/app_inputs.dart';
+import '../../../core/widgets/app_dialog.dart';
 import '../../../app/constants/app_constants.dart';
 import '../../../app/nav.dart';
 import '../../../core/clipboard/note_copier.dart';
@@ -303,24 +305,15 @@ class _NoteScreenState extends ConsumerState<NoteScreen> {
   }
 
   Future<void> _deleteAttachment(String path, AppStrings strings) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(strings.deleteAttachmentTitle),
-        content: Text(strings.deleteAttachmentMessage),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(strings.cancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(strings.delete),
-          ),
-        ],
-      ),
+    final ok = await showConfirmDialog(
+      context,
+      title: strings.deleteAttachmentTitle,
+      message: strings.deleteAttachmentMessage,
+      confirmLabel: strings.delete,
+      cancelLabel: strings.cancel,
+      destructive: true,
     );
-    if (ok != true) return;
+    if (!ok) return;
 
     setState(() {
       _imageTags.removeWhere((tag) => _tagPointsTo(tag, path));
@@ -495,23 +488,21 @@ class _NoteScreenState extends ConsumerState<NoteScreen> {
         TextEditingController(text: _noteSeparatorOverride ?? '');
     const inheritValue = '__inherit_separator__';
     const cancelValue = '__cancel_separator__';
-    final result = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(strings.noteSeparatorOverride),
+    final result = await showAppDialog<String>(
+      context,
+      builder: (context) => AppDialog(
+        title: strings.noteSeparatorOverride,
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(
+            AppTextField(
               controller: controller,
               autofocus: true,
-              decoration: InputDecoration(
-                labelText: strings.customSeparator,
-                hintText: '########',
-                helperText: _normalizedSeparator(globalSeparator) == null
-                    ? strings.defaultSeparator
-                    : globalSeparator,
-              ),
+              label: strings.customSeparator,
+              hint: '########',
+              helper: _normalizedSeparator(globalSeparator) == null
+                  ? strings.defaultSeparator
+                  : globalSeparator,
             ),
             const SizedBox(height: 8),
             Align(

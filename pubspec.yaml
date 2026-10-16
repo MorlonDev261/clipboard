@@ -1,7 +1,7 @@
-name: clipboard
-description: "Clipboard — a personal content library for social media managers and creators."
+name: influencor
+description: "Influencor — a personal content library for social media managers and creators."
 publish_to: "none"
-version: 0.1.2+4003
+version: 1.0.0+4004
 
 environment:
   sdk: ">=3.5.0 <4.0.0"
@@ -42,11 +42,10 @@ dependencies:
   # Clipboard image support (Flutter's native clipboard is text-only)
   pasteboard: ^0.4.0
 
-  # NOTE: flutter_secure_storage (future secrets) and permission_handler
-  # (runtime permissions) are intentionally NOT added yet — they pull in
-  # native code that is unused by the current MVP and breaks the Windows
-  # build on recent MSVC toolchains. They will be re-added, at compatible
-  # versions, in the milestone that actually needs them.
+  # NOTE: permission_handler (runtime permissions) is intentionally NOT added
+  # yet — it pulls in native code unused by the current MVP. Secure storage is
+  # in (Degany's API keys); its Windows part is overridden below to avoid the
+  # C++/ATL plugin that breaks the Windows build on these toolchains.
 
   # Utilities
   intl: any
@@ -61,9 +60,15 @@ dependencies:
   app_links: ^7.2.1
   firebase_core: ^4.15.0
   firebase_messaging: ^16.7.0
+  # AI assistant: calls the LLM provider the user configured (works on web too).
+  http: ^1.6.0
+  # Degany's API keys: Android Keystore, Apple Keychain, Windows DPAPI.
+  flutter_secure_storage: ^10.3.4
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  # Tested directly (test/secure_storage_windows_test.dart); see the override.
+  flutter_secure_storage_windows: any
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.1
   flutter_native_splash: ^2.4.4
@@ -95,3 +100,10 @@ flutter_launcher_icons:
     icon_size: 256
   macos:
     generate: true
+
+dependency_overrides:
+  # Windows part of flutter_secure_storage without its C++ plugin, which needs
+  # the Visual Studio ATL component (missing from the build tools). Storage is
+  # DPAPI from Dart FFI, as in the official package. See the folder's pubspec.
+  flutter_secure_storage_windows:
+    path: third_party/flutter_secure_storage_windows

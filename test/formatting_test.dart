@@ -1,7 +1,7 @@
-import 'package:clipboard/core/formatting/list_format.dart';
-import 'package:clipboard/core/formatting/note_separator.dart';
-import 'package:clipboard/core/formatting/note_clipboard.dart';
-import 'package:clipboard/core/formatting/unicode_styler.dart';
+import 'package:influencor/core/formatting/list_format.dart';
+import 'package:influencor/core/formatting/note_separator.dart';
+import 'package:influencor/core/formatting/note_clipboard.dart';
+import 'package:influencor/core/formatting/unicode_styler.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 List<int> runes(String s) => s.runes.toList();

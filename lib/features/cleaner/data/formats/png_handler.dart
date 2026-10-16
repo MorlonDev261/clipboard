@@ -123,7 +123,7 @@ class PngHandler extends ByteFormatHandler {
 
     if (out != null) {
       final exifOrientation =
-          options.preserveOrientation && orientation != null && orientation > 1
+          options.keepOrientationFlag && orientation != null && orientation > 1
               ? orientation
               : null;
       out.add(b.sublist(0, 8));

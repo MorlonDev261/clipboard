@@ -27,38 +27,4 @@ file is produced and the original is untouched.
 | AVI | everything else | `LIST INFO`, `IDIT` |
 | PDF | everything reachable from `/Root`, rewritten as a fresh classic file | Info dict, XMP, `/PieceInfo`, thumbnails, annotation author/date, trailer `/ID`, **obsolete objects of incremental saves**, EXIF/XMP inside embedded JPEG images. Encrypted PDFs refused |
 
-**Orientation:** removing EXIF drops the rotation flag, so a minimal EXIF holding
-only the orientation tag is written back (`CleanOptions.preserveOrientation`).
-
-## Verification (what "verified" means)
-
-After writing, the output is re-parsed by the same handler in read-only mode and
-cross-checked by `SignatureScanner` (XMP / IPTC / C2PA byte signatures, no
-shared parsing code). `verifiedClean` = nothing sensitive left;
-`cleanedWithCaveats` = clean plus a documented limit (`CleanCaveat`);
-`residualFound` = something survived. The report lists before / after per
-category — with the **actual values** where the format exposes them
-(`MetadataFinding.entries`; shown in two small tables, total vs removed, with a
-hide-values toggle; never logged). Every string is localised (fr / en / mg — mg is best-effort, have it
-reviewed by a native speaker).
-
-How it was validated beyond unit tests:
-
-* `test/cleaner/fuzz_test.dart`: truncated / bit-flipped inputs for every
-  format never crash, hang, or leave a partial output.
-* Real files (iPhone HEIC + Live-Photo MOV, TikTok-style H.264 MP4, AVIF, Edge
-  PDF, Pillow JPEG/PNG/WebP/GIF/TIFF): pixels identical after cleaning; for
-  video, every sample of every kept track byte-identical except the SEI units.
-  Windows' own decoders confirm playback: `Windows.Data.Pdf` renders the cleaned
-  PDF pixel-identically and `StorageFile.GetThumbnailAsync` decodes identical
-  frames from the cleaned MP4 / MOV (HEVC) / HEIC.
-
-## Remaining limits (stated in the UI, not hidden)
-
-* Video in codecs other than H.264 / HEVC: container metadata is cleaned but
-  encoder text inside the stream is not inspected (`unsupportedCodecStream`).
-* MKV/WebM attachments (fonts, cover art) are kept (`attachmentsKept`).
-* RAW/DNG, BigTIFF, encrypted PDF, unknown formats: reported `unsupported`, not
-  modified. PDF text content, images' *pixels*, visible watermarks and
-  steganography are out of scope by nature.
-* Chrome-style PDFs with predictor-encoded object streams are refused.
+**Orientation:** the app runs with `CleanOptions.stripAll`: no ICC profile and no orientation flag. For JPEG the EXIF rotation is *baked into the pixels losslessly* (`jpeg_rotate.dart`): quantised DCT coefficients are transposed / mirrored (sign flips on odd frequencies, quant tables transposed for 90-degree cases) and re-entropy-coded with freshly optimised Huffman tables, so nothing is re-compressed. It needs baseline Huffman, a single scan and, on a mirrored axis, dimensions that are a whole number of MCUs (true for most camera photos). Otherwise (progressive, odd sizes) it falls back to a minimal EXIF holding only the orientation and reports `CleanCaveat.orientationFlagKept`. PNG / WebP cannot rotate pixels, so they keep the minimal flag (`CleanOptions.keepOrientationFlag`). Library defaults (`preserveOrientation`) are unchanged.

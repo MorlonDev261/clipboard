@@ -1,3 +1,10 @@
+param(
+  # Android + Windows only (no web build).
+  [switch]$SkipWeb,
+  # Do not publish the new APK/EXE to the influencor-web site.
+  [switch]$SkipWebsite
+)
+
 $ErrorActionPreference = 'Stop'
 
 $repo = Split-Path -Parent $PSScriptRoot
@@ -13,6 +20,7 @@ if (Test-Path $jbr) {
 Push-Location $repo
 try {
   flutter build windows --release
+  if ($LASTEXITCODE -ne 0) { throw "Windows build failed" }
 
   $releaseDir = Join-Path $repo 'build/windows/x64/runner/Release'
   $payload = Join-Path $repo 'build/windows/x64/runner/influencor-windows-release.zip'
@@ -22,16 +30,56 @@ try {
   Compress-Archive -Path (Join-Path $releaseDir '*') -DestinationPath $payload -Force
   powershell -NoProfile -ExecutionPolicy Bypass -File $singleExeBuilder
 
-  if (Get-Command iscc -ErrorAction SilentlyContinue) {
-    iscc installer/influencor.iss
+  # iscc on PATH, or the per-user / machine-wide Inno Setup 6 install.
+  $iscc = (Get-Command iscc -ErrorAction SilentlyContinue).Source
+  if (-not $iscc) {
+    $iscc = @(
+      (Join-Path $env:LOCALAPPDATA 'Programs\Inno Setup 6\ISCC.exe'),
+      (Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'),
+      (Join-Path $env:ProgramFiles 'Inno Setup 6\ISCC.exe')
+    ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+  }
+  if ($iscc) {
+    & $iscc installer/influencor.iss
+    if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed ($LASTEXITCODE)" }
   } else {
     Write-Host 'Inno Setup compiler (iscc) not found; skipping Windows installer.'
   }
 
+  # Android: one APK per ABI, a universal APK, and the Play Store bundle.
   flutter build apk --release --split-per-abi
-  flutter build web --release --no-wasm-dry-run
+  if ($LASTEXITCODE -ne 0) { throw "APK (split) build failed" }
+  flutter build apk --release
+  if ($LASTEXITCODE -ne 0) { throw "APK (universal) build failed" }
+  flutter build appbundle --release
+  if ($LASTEXITCODE -ne 0) { throw "AAB build failed" }
 
-  powershell -NoProfile -ExecutionPolicy Bypass -File $collector
+  if (-not $SkipWeb) {
+    flutter build web --release --no-wasm-dry-run
+  }
+
+  if ($SkipWeb) {
+    powershell -NoProfile -ExecutionPolicy Bypass -File $collector -SkipWeb
+  } else {
+    powershell -NoProfile -ExecutionPolicy Bypass -File $collector
+  }
+
+  # Website (influencor-web repo, cloned next to this one): copy the new APK/EXE,
+  # commit and push; the server picks the commit up within 5 minutes.
+  if (-not $SkipWebsite) {
+    $website = Join-Path (Split-Path -Parent $repo) 'influencor-web'
+    if (Test-Path (Join-Path $website 'package.json')) {
+      Push-Location $website
+      try {
+        bun run publish-release
+        if ($LASTEXITCODE -ne 0) { throw "Website publish failed ($LASTEXITCODE)" }
+      } finally {
+        Pop-Location
+      }
+    } else {
+      Write-Host "influencor-web not found at $website; website not updated."
+    }
+  }
 } finally {
   Pop-Location
 }

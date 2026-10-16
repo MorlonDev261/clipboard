@@ -1,12 +1,12 @@
-import 'package:clipboard/app/app.dart';
-import 'package:clipboard/core/providers/settings_providers.dart';
-import 'package:clipboard/core/providers/workspace_providers.dart';
-import 'package:clipboard/core/services/settings_service.dart';
-import 'package:clipboard/features/about/presentation/about_screen.dart';
-import 'package:clipboard/features/reseller/data/reseller_config.dart';
-import 'package:clipboard/features/reseller/presentation/mode_badge.dart';
-import 'package:clipboard/features/settings/presentation/settings_screen.dart';
-import 'package:clipboard/shared/enums/enums.dart';
+import 'package:influencor/app/app.dart';
+import 'package:influencor/core/providers/settings_providers.dart';
+import 'package:influencor/core/providers/workspace_providers.dart';
+import 'package:influencor/core/services/settings_service.dart';
+import 'package:influencor/features/about/presentation/about_screen.dart';
+import 'package:influencor/features/reseller/data/reseller_config.dart';
+import 'package:influencor/features/reseller/presentation/mode_badge.dart';
+import 'package:influencor/features/settings/presentation/settings_screen.dart';
+import 'package:influencor/shared/enums/enums.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -92,6 +92,12 @@ void main() {
     test('the login entry point is the reseller /login', () {
       expect(ResellerConfig.loginUri.toString(),
           'https://reseller.poma-original.com/login');
+    });
+
+    test('professional access opens the reseller program /about', () {
+      expect(ResellerConfig.aboutUri.toString(),
+          'https://reseller.poma-original.com/about');
+      expect(ResellerConfig.isTrusted(ResellerConfig.aboutUri), isTrue);
     });
   });
 

@@ -1,3 +1,9 @@
+param(
+  # Leave web out: an old build/web would otherwise be filed under this
+  # version.
+  [switch]$SkipWeb
+)
+
 $ErrorActionPreference = 'Stop'
 
 $repo = Split-Path -Parent $PSScriptRoot
@@ -72,12 +78,17 @@ foreach ($target in $targets) {
   Copy-IfExists (Join-Path $repo 'build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk') $androidDir 'Influencor-armeabi-v7a-release.apk'
   Copy-IfExists (Join-Path $repo 'build/app/outputs/flutter-apk/app-x86_64-release.apk') $androidDir 'Influencor-x86_64-release.apk'
   Copy-IfExists (Join-Path $repo 'build/app/outputs/flutter-apk/app-release.apk') $androidDir 'Influencor-universal-release.apk'
+  Copy-IfExists (Join-Path $repo 'build/app/outputs/bundle/release/app-release.aab') $androidDir 'Influencor-release.aab'
 
   Copy-IfExists (Join-Path $repo 'build/installer/InfluencorSetup.exe') $windowsDir 'InfluencorSetup.exe'
   Copy-IfExists (Join-Path $repo 'build/windows/x64/runner/Influencor.exe') $windowsDir 'Influencor-portable.exe'
-  Copy-IfExists (Join-Path $repo 'build/windows/x64/runner/Release/clipboard.exe') $windowsDir 'clipboard.exe'
+  Copy-IfExists (Join-Path $repo 'build/windows/x64/runner/Release/influencor.exe') $windowsDir 'influencor.exe'
+  # The whole Release folder (exe + DLLs + data): the bare exe cannot run alone.
+  Copy-IfExists (Join-Path $repo 'build/windows/x64/runner/influencor-windows-release.zip') $windowsDir 'Influencor-windows-x64.zip'
 
-  Copy-DirectoryIfExists (Join-Path $repo 'build/web') $webDir
+  if (-not $SkipWeb) {
+    Copy-DirectoryIfExists (Join-Path $repo 'build/web') $webDir
+  }
 }
 
 Write-Host ''

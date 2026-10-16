@@ -3,7 +3,7 @@ abstract final class AppConstants {
   static const String appName = 'Influencor';
 
   /// Keep in sync with `version:` in pubspec.yaml (without the build number).
-  static const String version = '0.1.2';
+  static const String version = '1.0.0';
 
   /// Layout breakpoint (logical pixels) above which the desktop / tablet
   /// layout (persistent sidebar, wider grids) is used.

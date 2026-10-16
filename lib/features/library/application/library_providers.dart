@@ -191,6 +191,17 @@ class LibraryController {
     return path;
   }
 
+  Future<String> createTable(
+    String dirPath, {
+    required String name,
+    required TableDocument table,
+  }) async {
+    final path = await _repo.createTable(dirPath, name: name, table: table);
+    _ref.invalidate(directoryProvider(dirPath));
+    _touchIndex();
+    return path;
+  }
+
   Future<String> readNote(String path) => _repo.readTextFile(path);
 
   /// Copies [sourcePath] into the note folder's `.attachments` and returns the
@@ -261,6 +272,34 @@ class LibraryController {
     await _repo.duplicate(path);
     if (parentDir != null) _ref.invalidate(directoryProvider(parentDir));
     _touchIndex();
+  }
+
+  /// Saves a cleaned copy of [path] (see [LibraryRepository.storeCleaned]).
+  Future<String> storeCleaned(
+    String path,
+    String cleanedTemp, {
+    required bool replace,
+    String? parentDir,
+  }) async {
+    final result =
+        await _repo.storeCleaned(path, cleanedTemp, replace: replace);
+    if (parentDir != null) _ref.invalidate(directoryProvider(parentDir));
+    _touchIndex();
+    return result;
+  }
+
+  /// Saves a cleaned copy into a library folder (see
+  /// [LibraryRepository.storeCleanedIn]).
+  Future<String> storeCleanedIn(
+    String dirPath,
+    String sourcePath,
+    String cleanedTemp,
+  ) async {
+    final result =
+        await _repo.storeCleanedIn(dirPath, sourcePath, cleanedTemp);
+    _ref.invalidate(directoryProvider(dirPath));
+    _touchIndex();
+    return result;
   }
 
   Future<void> moveToTrash(String path, {String? parentDir}) async {

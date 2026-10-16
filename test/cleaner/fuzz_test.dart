@@ -2,8 +2,8 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
-import 'package:clipboard/features/cleaner/data/clean_pipeline.dart';
-import 'package:clipboard/features/cleaner/domain/clean_report.dart';
+import 'package:influencor/features/cleaner/data/clean_pipeline.dart';
+import 'package:influencor/features/cleaner/domain/clean_report.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'fixtures.dart';

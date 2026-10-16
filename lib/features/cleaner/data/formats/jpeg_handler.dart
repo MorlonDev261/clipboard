@@ -5,14 +5,7 @@ import '../../domain/clean_report.dart';
 import '../binary.dart';
 import '../exif_inspector.dart';
 import '../format_handler.dart';
-
-class _Segment {
-  _Segment(this.marker, this.start, this.end);
-
-  final int marker;
-  final int start; // offset of the 0xFF marker byte
-  final int end; // exclusive; for SOS this includes the entropy-coded data
-}
+import 'jpeg_rotate.dart';
 
 /// JPEG: keeps only the segments needed to decode the picture (+ JFIF, Adobe
 /// colour transform, optionally the ICC profile) and re-inserts a minimal EXIF
@@ -33,7 +26,7 @@ class JpegHandler extends ByteFormatHandler {
     if (n < 4 || b[0] != 0xFF || b[1] != 0xD8) {
       throw const FormatException('Not a JPEG');
     }
-    final segments = <_Segment>[];
+    final segments = <JpegSegment>[];
     var trailing = 0;
     var i = 2;
     while (i < n) {
@@ -46,13 +39,13 @@ class JpegHandler extends ByteFormatHandler {
       final start = i - 1;
       i++;
       if (marker == 0xD9) {
-        segments.add(_Segment(marker, start, i));
+        segments.add(JpegSegment(marker, start, i));
         trailing = n - i;
         i = n;
         break;
       }
       if (marker == 0x01 || (marker >= 0xD0 && marker <= 0xD7)) {
-        segments.add(_Segment(marker, start, i));
+        segments.add(JpegSegment(marker, start, i));
         continue;
       }
       if (marker == 0x00 || marker == 0xD8) {
@@ -78,7 +71,7 @@ class JpegHandler extends ByteFormatHandler {
         }
         end = j + 1 >= n ? n : j;
       }
-      segments.add(_Segment(marker, start, end));
+      segments.add(JpegSegment(marker, start, end));
       i = end;
     }
 
@@ -157,11 +150,30 @@ class JpegHandler extends ByteFormatHandler {
       }
     }
 
+    final caveats = <CleanCaveat>{};
     if (out != null) {
-      final exifOrientation =
-          options.preserveOrientation && orientation != null && orientation > 1
-              ? orientation
+      final rotated =
+          options.bakeOrientation && orientation != null && orientation > 1
+              ? rotateJpegLossless(b, segments, orientation)
               : null;
+      if (rotated != null) {
+        // Rotation now lives in the coefficients: no orientation flag at all.
+        out.add(const [0xFF, 0xD8]);
+        for (var s = 0; s < segments.length; s++) {
+          final m = segments[s].marker;
+          if (!keep[s] || !((m >= 0xE0 && m <= 0xEF) || m == 0xFE)) continue;
+          out.add(rewrite[s] ?? b.sublist(segments[s].start, segments[s].end));
+        }
+        out.add(rotated);
+        out.add(const [0xFF, 0xD9]);
+        return HandlerResult(findings, caveats);
+      }
+      final wantsFlag =
+          options.keepOrientationFlag && orientation != null && orientation > 1;
+      if (options.bakeOrientation && wantsFlag) {
+        caveats.add(CleanCaveat.orientationFlagKept);
+      }
+      final exifOrientation = wantsFlag ? orientation : null;
       var exifWritten = exifOrientation == null;
       out.add(const [0xFF, 0xD8]);
       for (var s = 0; s < segments.length; s++) {
@@ -174,7 +186,7 @@ class JpegHandler extends ByteFormatHandler {
         out.add(rewrite[s] ?? b.sublist(seg.start, seg.end));
       }
     }
-    return HandlerResult(findings);
+    return HandlerResult(findings, caveats);
   }
 
   static Uint8List _exifSegment(int orientation) {

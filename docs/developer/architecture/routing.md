@@ -19,6 +19,10 @@ avec GoRouter.
 | `/favorites` | FavoritesScreen |
 | `/assistant` | AssistantScreen |
 | `/trash` | TrashScreen |
+| `/menu` | MenuScreen (comptabilité, tâches, réglages) |
+| `/accounting` | AccountingScreen |
+| `/task` | TasksScreen |
+| `/task/edit?id=<id>` | TaskEditorScreen |
 | `/settings` | SettingsScreen |
 
 ## Helpers de navigation
@@ -33,3 +37,5 @@ Il choisit:
 
 - une barre inférieure sur mobile;
 - une NavigationRail sur desktop/tablette.
+
+Le dernier onglet est le **Menu** (icône à trois barres, `/menu`); il reste sélectionné sur `/accounting`, `/task*`, `/settings` et `/about`. Voir [Comptabilité, tâches et menu](./accounting-and-tasks.md).

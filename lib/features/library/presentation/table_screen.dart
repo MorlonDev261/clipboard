@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
 
+import '../../../app/constants/app_constants.dart';
 import '../../../core/l10n/app_strings.dart';
 import '../application/library_providers.dart';
 import '../domain/table_document.dart';
@@ -24,8 +26,31 @@ class _TableScreenState extends ConsumerState<TableScreen> {
   bool _editing = false;
   bool _dirty = false;
   bool _saving = false;
+  bool _showHiddenColumns = false;
   final _columnControllers = <String, TextEditingController>{};
   final _cellControllers = <String, TextEditingController>{};
+
+  void _toggleHiddenColumns([AppStrings? strings]) {
+    HapticFeedback.mediumImpact();
+    setState(() {
+      _showHiddenColumns = !_showHiddenColumns;
+    });
+    if (strings != null && mounted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              _showHiddenColumns
+                  ? strings.showHiddenColumns
+                  : strings.hideHiddenColumns,
+            ),
+            duration: const Duration(seconds: 1),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+    }
+  }
 
   @override
   void dispose() {
@@ -173,6 +198,7 @@ class _TableScreenState extends ConsumerState<TableScreen> {
         _saving = false;
         _editing = false;
         _dirty = false;
+        _showHiddenColumns = false;
         _loadedSignature = table.toPrettyJson();
       });
       ScaffoldMessenger.of(context)
@@ -191,20 +217,35 @@ class _TableScreenState extends ConsumerState<TableScreen> {
   Widget build(BuildContext context) {
     final strings = ref.watch(appStringsProvider);
     final table = ref.watch(tableDocumentProvider(widget.path));
+    // Sync before the app bar is built: its edit button needs the draft, and
+    // the body (which also syncs) is built after it.
+    if (table.value case final data?) _syncDraft(data);
 
     return Scaffold(
       appBar: AppBar(
         title: Text(p.basenameWithoutExtension(widget.path)),
         actions: [
           if (_draft != null)
-            IconButton(
-              tooltip: _editing ? strings.cancel : strings.edit,
-              icon: Icon(_editing ? Icons.close : Icons.edit_outlined),
-              onPressed: _saving
-                  ? null
-                  : () => setState(() {
-                        _editing = !_editing;
-                      }),
+            // Long press toggles the hidden ([…]) columns. The tooltip only
+            // shows on mouse hover: as a long-press tooltip (the touch
+            // default) it would swallow that gesture.
+            Tooltip(
+              message: _editing ? strings.cancel : strings.edit,
+              triggerMode: TooltipTriggerMode.manual,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onLongPress:
+                    _saving ? null : () => _toggleHiddenColumns(strings),
+                child: IconButton(
+                  icon: Icon(_editing ? Icons.close : Icons.edit_outlined),
+                  onPressed: _saving
+                      ? null
+                      : () => setState(() {
+                            _editing = !_editing;
+                            if (!_editing) _showHiddenColumns = false;
+                          }),
+                ),
+              ),
             ),
           if (_editing && _draft != null)
             IconButton(
@@ -226,6 +267,9 @@ class _TableScreenState extends ConsumerState<TableScreen> {
             : _TableCanvas(
                 table: _draft!,
                 editing: _editing,
+                showHiddenColumns: _showHiddenColumns,
+                onToggleHiddenColumns: _toggleHiddenColumns,
+                strings: strings,
                 columnControllers: _columnControllers,
                 cellControllers: _cellControllers,
                 onColumnChanged: _updateColumnTitle,
@@ -245,6 +289,9 @@ class _TableScreenState extends ConsumerState<TableScreen> {
           return _TableCanvas(
             table: draft,
             editing: _editing,
+            showHiddenColumns: _showHiddenColumns,
+            onToggleHiddenColumns: _toggleHiddenColumns,
+            strings: strings,
             columnControllers: _columnControllers,
             cellControllers: _cellControllers,
             onColumnChanged: _updateColumnTitle,
@@ -264,6 +311,9 @@ class _TableCanvas extends StatelessWidget {
   const _TableCanvas({
     required this.table,
     required this.editing,
+    required this.showHiddenColumns,
+    required this.onToggleHiddenColumns,
+    required this.strings,
     required this.columnControllers,
     required this.cellControllers,
     required this.onColumnChanged,
@@ -276,6 +326,9 @@ class _TableCanvas extends StatelessWidget {
 
   final TableDocument table;
   final bool editing;
+  final bool showHiddenColumns;
+  final VoidCallback onToggleHiddenColumns;
+  final AppStrings strings;
   final Map<String, TextEditingController> columnControllers;
   final Map<String, TextEditingController> cellControllers;
   final void Function(String columnId, String value) onColumnChanged;
@@ -290,86 +343,187 @@ class _TableCanvas extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final borderColor = scheme.outlineVariant;
+    final isMobile =
+        MediaQuery.sizeOf(context).width < AppConstants.desktopBreakpoint;
+    final padding = isMobile ? 12.0 : 20.0;
+
+    final displayedColumns = showHiddenColumns
+        ? table.columns
+        : table.columns
+            .where((c) => !TableDocument.isBracketColumnTitle(c.title))
+            .toList();
+
+    final Widget tableWidget;
+    if (displayedColumns.isEmpty) {
+      tableWidget = DecoratedBox(
+        decoration: BoxDecoration(
+          border: Border.all(color: borderColor),
+          borderRadius: BorderRadius.circular(8),
+          color: scheme.surfaceContainerLow,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.visibility_off_outlined,
+                  size: 36, color: scheme.primary),
+              const SizedBox(height: 10),
+              Text(
+                strings.allColumnsHidden,
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: scheme.onSurface,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                strings.longPressToToggleColumns,
+                style: TextStyle(fontSize: 13, color: scheme.outline),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    } else {
+      tableWidget = DecoratedBox(
+        decoration: BoxDecoration(
+          border: Border.all(color: borderColor),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Table(
+            defaultColumnWidth: isMobile
+                ? const FlexColumnWidth(1)
+                : const IntrinsicColumnWidth(),
+            columnWidths: isMobile
+                ? {
+                    for (var i = 0; i < displayedColumns.length; i++)
+                      i: const FlexColumnWidth(1),
+                  }
+                : null,
+            border: TableBorder.all(color: borderColor),
+            children: [
+              TableRow(
+                decoration: BoxDecoration(color: scheme.primaryContainer),
+                children: [
+                  for (final column in displayedColumns)
+                    _HeaderCell(
+                      controller: columnControllers[column.id],
+                      title: column.title,
+                      editing: editing,
+                      fullWidth: isMobile,
+                      onChanged: (value) => onColumnChanged(column.id, value),
+                    ),
+                ],
+              ),
+              for (final row in table.rows)
+                TableRow(
+                  children: [
+                    for (final column in displayedColumns)
+                      _BodyCell(
+                        controller: cellControllers['${row.id}::${column.id}'],
+                        value: row.cells[column.id] ?? '',
+                        editing: editing,
+                        fullWidth: isMobile,
+                        onChanged: (value) => onCellChanged(
+                          row.id,
+                          column.id,
+                          value,
+                        ),
+                      ),
+                  ],
+                ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final animatedTable = AnimatedSize(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOutCubic,
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 250),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        transitionBuilder: (child, animation) {
+          return FadeTransition(
+            opacity: animation,
+            child: child,
+          );
+        },
+        child: KeyedSubtree(
+          key: ValueKey(
+              'table_view_${displayedColumns.map((c) => c.id).join('_')}'),
+          child: tableWidget,
+        ),
+      ),
+    );
 
     return Center(
       child: Scrollbar(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          padding: EdgeInsets.all(padding),
+          child: isMobile
+              // Phone: the table fills the width (flex columns), the plus
+              // buttons sit side by side underneath.
+              ? Column(
                   mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    DecoratedBox(
-                      decoration: BoxDecoration(
-                        border: Border.all(color: borderColor),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Table(
-                          defaultColumnWidth: const IntrinsicColumnWidth(),
-                          border: TableBorder.all(color: borderColor),
-                          children: [
-                            TableRow(
-                              decoration:
-                                  BoxDecoration(color: scheme.primaryContainer),
-                              children: [
-                                for (final column in table.columns)
-                                  _HeaderCell(
-                                    controller: columnControllers[column.id],
-                                    title: column.title,
-                                    editing: editing,
-                                    onChanged: (value) =>
-                                        onColumnChanged(column.id, value),
-                                  ),
-                              ],
-                            ),
-                            for (final row in table.rows)
-                              TableRow(
-                                children: [
-                                  for (final column in table.columns)
-                                    _BodyCell(
-                                      controller: cellControllers[
-                                          '${row.id}::${column.id}'],
-                                      value: row.cells[column.id] ?? '',
-                                      editing: editing,
-                                      onChanged: (value) => onCellChanged(
-                                        row.id,
-                                        column.id,
-                                        value,
-                                      ),
-                                    ),
-                                ],
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
+                    animatedTable,
                     if (editing) ...[
-                      const SizedBox(width: 8),
-                      _PlusButton(
-                        tooltip: addColumnTooltip,
-                        onPressed: onAddColumn,
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          _PlusButton(
+                            tooltip: addColumnTooltip,
+                            onPressed: onAddColumn,
+                          ),
+                          const SizedBox(width: 8),
+                          _PlusButton(
+                            tooltip: addRowTooltip,
+                            onPressed: onAddRow,
+                          ),
+                        ],
                       ),
                     ],
                   ],
-                ),
-                if (editing) ...[
-                  const SizedBox(height: 8),
-                  _PlusButton(
-                    tooltip: addRowTooltip,
-                    onPressed: onAddRow,
+                )
+              : SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          animatedTable,
+                          if (editing) ...[
+                            const SizedBox(width: 8),
+                            _PlusButton(
+                              tooltip: addColumnTooltip,
+                              onPressed: onAddColumn,
+                            ),
+                          ],
+                        ],
+                      ),
+                      if (editing) ...[
+                        const SizedBox(height: 8),
+                        _PlusButton(
+                          tooltip: addRowTooltip,
+                          onPressed: onAddRow,
+                        ),
+                      ],
+                    ],
                   ),
-                ],
-              ],
-            ),
-          ),
+                ),
         ),
       ),
     );
@@ -382,43 +536,77 @@ class _HeaderCell extends StatelessWidget {
     required this.title,
     required this.editing,
     required this.onChanged,
+    this.fullWidth = false,
   });
 
   final TextEditingController? controller;
   final String title;
   final bool editing;
+  final bool fullWidth;
   final ValueChanged<String> onChanged;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final isBracketed = TableDocument.isBracketColumnTitle(title);
+
+    final child = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: editing && controller != null
+          ? TextField(
+              controller: controller,
+              onChanged: onChanged,
+              style: TextStyle(
+                color: scheme.onPrimaryContainer,
+                fontWeight: FontWeight.w700,
+              ),
+              decoration: InputDecoration(
+                isDense: true,
+                border: InputBorder.none,
+                filled: false,
+                contentPadding: EdgeInsets.zero,
+                prefixIcon: isBracketed
+                    ? Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: Icon(
+                          Icons.visibility_off_outlined,
+                          size: 16,
+                          color:
+                              scheme.onPrimaryContainer.withValues(alpha: 0.7),
+                        ),
+                      )
+                    : null,
+                prefixIconConstraints:
+                    const BoxConstraints(minWidth: 20, maxHeight: 20),
+              ),
+            )
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (isBracketed) ...[
+                  Icon(
+                    Icons.visibility_off_outlined,
+                    size: 15,
+                    color: scheme.onPrimaryContainer.withValues(alpha: 0.7),
+                  ),
+                  const SizedBox(width: 6),
+                ],
+                Flexible(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      color: scheme.onPrimaryContainer,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+    );
+    if (fullWidth) return child;
     return ConstrainedBox(
       constraints: const BoxConstraints(minWidth: 140, maxWidth: 260),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        child: editing && controller != null
-            ? TextField(
-                controller: controller,
-                onChanged: onChanged,
-                style: TextStyle(
-                  color: scheme.onPrimaryContainer,
-                  fontWeight: FontWeight.w700,
-                ),
-                decoration: const InputDecoration(
-                  isDense: true,
-                  border: InputBorder.none,
-                  filled: false,
-                  contentPadding: EdgeInsets.zero,
-                ),
-              )
-            : Text(
-                title,
-                style: TextStyle(
-                  color: scheme.onPrimaryContainer,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-      ),
+      child: child,
     );
   }
 }
@@ -429,34 +617,38 @@ class _BodyCell extends StatelessWidget {
     required this.value,
     required this.editing,
     required this.onChanged,
+    this.fullWidth = false,
   });
 
   final TextEditingController? controller;
   final String value;
   final bool editing;
+  final bool fullWidth;
   final ValueChanged<String> onChanged;
 
   @override
   Widget build(BuildContext context) {
+    final child = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: editing && controller != null
+          ? TextField(
+              controller: controller,
+              onChanged: onChanged,
+              minLines: 1,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                isDense: true,
+                border: InputBorder.none,
+                filled: false,
+                contentPadding: EdgeInsets.zero,
+              ),
+            )
+          : Text(value.isEmpty ? ' ' : value),
+    );
+    if (fullWidth) return child;
     return ConstrainedBox(
       constraints: const BoxConstraints(minWidth: 140, maxWidth: 260),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: editing && controller != null
-            ? TextField(
-                controller: controller,
-                onChanged: onChanged,
-                minLines: 1,
-                maxLines: 3,
-                decoration: const InputDecoration(
-                  isDense: true,
-                  border: InputBorder.none,
-                  filled: false,
-                  contentPadding: EdgeInsets.zero,
-                ),
-              )
-            : Text(value.isEmpty ? ' ' : value),
-      ),
+      child: child,
     );
   }
 }
@@ -472,10 +664,29 @@ class _PlusButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return IconButton.filledTonal(
-      tooltip: tooltip,
-      icon: const Icon(Icons.add),
-      onPressed: onPressed,
+    final scheme = Theme.of(context).colorScheme;
+    return Tooltip(
+      message: tooltip,
+      child: SizedBox(
+        width: 40,
+        height: 40,
+        child: Material(
+          color: scheme.secondaryContainer,
+          shape: const CircleBorder(),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: onPressed,
+            child: Center(
+              child: Icon(
+                Icons.add,
+                size: 24,
+                color: scheme.onSecondaryContainer,
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

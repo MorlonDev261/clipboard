@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
@@ -76,7 +77,7 @@ Future<int> copyNoteToClipboard(String text, List<String> imagePaths) async {
       first.add(Formats.htmlText(_buildHtml(text, images)));
       first.add(Formats.plainText(text));
     }
-    first.add(firstImage.format(firstImage.bytes));
+    await _addImage(first, firstImage);
     // On desktop also expose the real file so it pastes into file managers.
     if (_desktop && images.length == 1 && files.isEmpty) {
       first.add(Formats.fileUri(Uri.file(firstImage.path)));
@@ -87,7 +88,7 @@ Future<int> copyNoteToClipboard(String text, List<String> imagePaths) async {
   }
   for (final image in images.skip(1)) {
     items.add(
-      DataWriterItem(suggestedName: image.name)..add(image.format(image.bytes)),
+      await _addImage(DataWriterItem(suggestedName: image.name), image),
     );
   }
   for (final file in files) {
@@ -153,5 +154,30 @@ SimpleFileFormat? _formatFor(String path) {
       return Formats.tiff;
     default:
       return null;
+  }
+}
+
+/// Adds [image] to [item] in its own format plus a PNG rendition: PNG is the
+/// image format virtually every paste target (Paint, chat apps, editors) reads,
+/// whereas JPEG/WebP/GIF are ignored by many on Windows.
+Future<DataWriterItem> _addImage(DataWriterItem item, _Image image) async {
+  if (image.format != Formats.png) {
+    final png = await _toPng(image.bytes);
+    if (png != null) item.add(Formats.png(png));
+  }
+  item.add(image.format(image.bytes));
+  return item;
+}
+
+Future<Uint8List?> _toPng(Uint8List bytes) async {
+  try {
+    final codec = await ui.instantiateImageCodec(bytes);
+    final frame = await codec.getNextFrame();
+    final data = await frame.image.toByteData(format: ui.ImageByteFormat.png);
+    frame.image.dispose();
+    codec.dispose();
+    return data?.buffer.asUint8List();
+  } catch (_) {
+    return null;
   }
 }

@@ -1,0 +1,10 @@
+[Unit]
+Description=Mi Kandra - synchronisation des routes toutes les 5 minutes (@NAME@)
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+AccuracySec=30s
+
+[Install]
+WantedBy=timers.target

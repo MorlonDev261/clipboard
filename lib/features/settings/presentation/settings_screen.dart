@@ -2,11 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/widgets/app_inputs.dart';
+import '../../../core/widgets/app_dialog.dart';
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/picker/pick_workspace.dart';
 import '../../../core/providers/settings_providers.dart';
 import '../../../core/providers/workspace_providers.dart';
 import '../../../shared/enums/enums.dart';
+import '../../assistant/application/assistant_providers.dart';
+import '../../assistant/presentation/assistant_settings_screen.dart';
+import '../../fees/presentation/tariffs_settings_screen.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -24,20 +29,18 @@ class SettingsScreen extends ConsumerWidget {
     final controller = TextEditingController(text: current ?? '');
     const resetValue = '__reset_separator__';
     const cancelValue = '__cancel_separator__';
-    final result = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(strings.noteSeparator),
+    final result = await showAppDialog<String>(
+      context,
+      builder: (context) => AppDialog(
+        title: strings.noteSeparator,
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(
+            AppTextField(
               controller: controller,
               autofocus: true,
-              decoration: InputDecoration(
-                labelText: strings.customSeparator,
-                hintText: '########',
-              ),
+              label: strings.customSeparator,
+              hint: '########',
             ),
             const SizedBox(height: 8),
             Align(
@@ -72,6 +75,14 @@ class SettingsScreen extends ConsumerWidget {
         .setNoteSeparator(result == resetValue ? null : result);
   }
 
+  /// "Claude (Anthropic) · claude-opus-5-5", or a hint while not connected.
+  String _assistantSubtitle(WidgetRef ref, AppStrings strings) {
+    final config = ref.watch(assistantConfigProvider);
+    return config.isReady
+        ? '${config.provider.label} · ${config.model}'
+        : strings.assistantSettingsHint;
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final strings = ref.watch(appStringsProvider);
@@ -80,7 +91,10 @@ class SettingsScreen extends ConsumerWidget {
     final controller = ref.read(settingsControllerProvider.notifier);
 
     return Scaffold(
-      appBar: AppBar(title: Text(strings.settings)),
+      appBar: AppBar(
+        leading: BackButton(onPressed: () => context.go('/menu')),
+        title: Text(strings.settings),
+      ),
       body: Column(
         children: [
           Expanded(
@@ -158,6 +172,28 @@ class SettingsScreen extends ConsumerWidget {
                       Text(settings.noteSeparator ?? strings.defaultSeparator),
                   onTap: () => _editGlobalSeparator(
                       context, ref, settings.noteSeparator),
+                ),
+                const Divider(),
+                ListTile(
+                  key: const ValueKey('settings-assistant'),
+                  leading: const Icon(Icons.auto_awesome_outlined),
+                  title: Text(strings.assistantSettings),
+                  subtitle: Text(_assistantSubtitle(ref, strings)),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                        builder: (_) => const AssistantSettingsScreen()),
+                  ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.price_change_outlined),
+                  title: Text(strings.feeTariffs),
+                  subtitle: Text(strings.feeTariffsHint),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                        builder: (_) => const TariffsSettingsScreen()),
+                  ),
                 ),
                 const Divider(),
                 ListTile(

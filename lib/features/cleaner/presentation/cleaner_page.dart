@@ -3,7 +3,6 @@ import 'dart:io';
 import 'dart:ui';
 
 import 'package:desktop_drop/desktop_drop.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
@@ -11,16 +10,36 @@ import 'package:path/path.dart' as p;
 import '../../../core/l10n/app_strings.dart';
 import '../../../core/picker/app_file_picker.dart';
 import '../../../core/picker/pick_mode.dart';
+import '../../../core/services/storage_permission_service.dart';
 import '../../library/domain/library_entry.dart';
 import '../../library/presentation/widgets/video_preview.dart';
 import '../application/metadata_cleaner_service.dart';
 import '../domain/clean_report.dart';
 import 'clean_report_card.dart';
+import 'metadata_inspector_card.dart';
 
-/// The "Deganeo" tool: pick a photo/video, strip its metadata, verify the
-/// result with an independent re-scan, then save / replace / discard it.
+/// One file in the Deganeo queue.
+class _Job {
+  _Job(this.source);
+
+  final String source;
+  String? cleanPath;
+  CleanReport? report;
+
+  /// Metadata the original carries (null while being read).
+  List<MetadataFinding>? inspection;
+  bool inspectFailed = false;
+  bool cleaning = false;
+  bool detailsOpen = false;
+}
+
+/// The "Deganeo" tool: add up to [CleanerPage.maxFiles] photos / videos /
+/// PDFs, inspect their metadata, strip it (one by one or all at once), verify
+/// each result with an independent re-scan, then save / replace / discard.
 class CleanerPage extends ConsumerStatefulWidget {
   const CleanerPage({super.key});
+
+  static const maxFiles = 20;
 
   @override
   ConsumerState<CleanerPage> createState() => _CleanerPageState();
@@ -28,12 +47,10 @@ class CleanerPage extends ConsumerStatefulWidget {
 
 class _CleanerPageState extends ConsumerState<CleanerPage> {
   final _cleaner = const MetadataCleanerService();
-  String? _sourcePath;
-  String? _cleanPath;
-  CleanReport? _cleanResult;
+  final _jobs = <_Job>[];
+  _Job? _selected;
   bool _dragging = false;
-  bool _cleaning = false;
-  bool _detailsOpen = false;
+  bool _busyAll = false;
 
   @override
   void initState() {
@@ -44,7 +61,9 @@ class _CleanerPageState extends ConsumerState<CleanerPage> {
 
   @override
   void dispose() {
-    _deleteTempSync(_cleanPath);
+    for (final job in _jobs) {
+      _deleteTempSync(job.cleanPath);
+    }
     super.dispose();
   }
 
@@ -54,87 +73,160 @@ class _CleanerPageState extends ConsumerState<CleanerPage> {
       context,
       mode: PickMode.mediaFiles,
       title: strings.selectMediaTitle,
-      allowMultiple: false,
+      allowMultiple: true,
     );
-    if (paths.isNotEmpty) _setSource(paths.first);
+    if (paths.isNotEmpty) _addPaths(paths);
   }
 
-  void _setSource(String path) {
-    _deleteTempSync(_cleanPath);
+  void _addPaths(List<String> paths) {
+    final strings = ref.read(appStringsProvider);
+    final known = _jobs.map((j) => j.source).toSet();
+    final fresh = <String>[];
+    for (final path in paths) {
+      if (_isMediaPath(path) && known.add(path)) fresh.add(path);
+    }
+    if (fresh.isEmpty) return;
+    final room = (CleanerPage.maxFiles - _jobs.length).clamp(0, 1 << 30);
+    final accepted = fresh.take(room).toList();
+    final added = [for (final path in accepted) _Job(path)];
     setState(() {
-      _sourcePath = path;
-      _cleanPath = null;
-      _cleanResult = null;
-      _detailsOpen = false;
+      _jobs.addAll(added);
+      _selected ??= _jobs.isEmpty ? null : _jobs.first;
+    });
+    if (accepted.length < fresh.length) {
+      _snack(strings.tooManyFiles(CleanerPage.maxFiles));
+    }
+    for (final job in added) {
+      unawaited(_inspect(job));
+    }
+  }
+
+  Future<void> _inspect(_Job job) async {
+    final result = await _cleaner.inspect(job.source);
+    if (!mounted || !_jobs.contains(job)) return;
+    setState(() {
+      job.inspection = result.findings;
+      job.inspectFailed = result.error != null;
     });
   }
 
-  Future<void> _clean() async {
-    final source = _sourcePath;
-    if (source == null) return;
+  void _remove(_Job job) {
+    _deleteTempSync(job.cleanPath);
+    setState(() {
+      final index = _jobs.indexOf(job);
+      _jobs.remove(job);
+      if (_selected == job) {
+        _selected =
+            _jobs.isEmpty ? null : _jobs[index.clamp(0, _jobs.length - 1)];
+      }
+    });
+  }
+
+  Future<void> _clean(_Job job) async {
     final strings = ref.read(appStringsProvider);
-    setState(() => _cleaning = true);
+    setState(() => job.cleaning = true);
     try {
       final started = DateTime.now();
-      final report = await _cleaner.clean(source);
+      final report = await _cleaner.clean(job.source);
       final elapsed = DateTime.now().difference(started);
       const minimum = Duration(milliseconds: 1500);
       if (elapsed < minimum) {
         await Future<void>.delayed(minimum - elapsed);
       }
-      if (!mounted) {
+      if (!mounted || !_jobs.contains(job)) {
         await _deleteTemp(report.outputPath);
         return;
       }
       setState(() {
-        _cleanPath = report.outputPath;
-        _cleanResult = report;
-        _cleaning = false;
-        _detailsOpen = !report.isClean;
+        job.cleanPath = report.outputPath;
+        job.report = report;
+        job.cleaning = false;
+        job.detailsOpen = !report.isClean;
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() => _cleaning = false);
+      setState(() => job.cleaning = false);
       _snack(strings.genericError);
     }
   }
 
-  /// Android / iOS savers need the bytes in memory; refuse files too large for
-  /// a phone instead of crashing the app.
-  static const _maxMobileSaveBytes = 150 * 1024 * 1024;
+  /// One file at a time: cleaning is CPU/IO heavy and each run is an isolate.
+  Future<void> _cleanAll() async {
+    setState(() => _busyAll = true);
+    try {
+      for (final job in List.of(_jobs)) {
+        if (!mounted) return;
+        if (job.report == null && !job.cleaning && _jobs.contains(job)) {
+          await _clean(job);
+        }
+      }
+    } finally {
+      if (mounted) setState(() => _busyAll = false);
+    }
+  }
 
-  Future<void> _download() async {
-    final clean = _cleanPath;
-    final source = _sourcePath;
-    if (clean == null || source == null) return;
+  /// The cleaned copy keeps the extension of its *real* format (a ".jpg" that
+  /// was a PNG is saved as ".png").
+  String _downloadName(_Job job) =>
+      '${p.basenameWithoutExtension(job.source)}_clean'
+      '${p.extension(job.cleanPath!)}';
+
+  /// Writes the cleaned copy next to its original (same folder, `_clean`
+  /// suffix, never overwriting) and registers it in the gallery index so other
+  /// apps (Facebook, WhatsApp...) list it as a normal image / video.
+  Future<void> _saveCopy(_Job job) async {
+    final target = _freeName(p.dirname(job.source), _downloadName(job));
+    await File(job.cleanPath!).copy(target);
+    await StoragePermissionService().scanMedia([target]);
+  }
+
+  Future<void> _download(_Job job) async {
+    if (job.cleanPath == null) return;
     final strings = ref.read(appStringsProvider);
     try {
-      final mobile = Platform.isAndroid || Platform.isIOS;
-      if (mobile && await File(clean).length() > _maxMobileSaveBytes) {
-        if (mounted) _snack(strings.genericError);
-        return;
-      }
-      final target = await FilePicker.saveFile(
-        dialogTitle: strings.download,
-        // The cleaned copy keeps the extension of its *real* format (a ".jpg"
-        // that was a PNG is saved as ".png").
-        fileName:
-            '${p.basenameWithoutExtension(source)}_clean${p.extension(clean)}',
-        bytes: mobile ? await File(clean).readAsBytes() : null,
-      );
-      if (target == null) return;
-      if (!mobile) await File(clean).copy(target);
-      await _eraseCleanCopy(showSnack: false);
+      await _saveCopy(job);
+      await _eraseCleanCopy(job, showSnack: false);
       if (mounted) _snack(strings.fileDownloaded);
     } catch (_) {
       if (mounted) _snack(strings.genericError);
     }
   }
 
-  Future<void> _replace() async {
-    final clean = _cleanPath;
-    final source = _sourcePath;
-    if (clean == null || source == null) return;
+  /// Saves every cleaned copy next to its own original.
+  Future<void> _downloadAll() async {
+    final strings = ref.read(appStringsProvider);
+    final ready = _jobs.where((j) => j.cleanPath != null).toList();
+    var saved = 0;
+    try {
+      for (final job in ready) {
+        await _saveCopy(job);
+        saved++;
+        if (mounted) await _eraseCleanCopy(job, showSnack: false);
+      }
+      if (mounted && saved > 0) _snack(strings.filesSaved(saved));
+    } catch (_) {
+      if (mounted) _snack(strings.genericError);
+    }
+  }
+
+  /// `name.ext` → `name (2).ext` … so a batch never overwrites a file.
+  String _freeName(String dir, String name) {
+    var candidate = p.join(dir, name);
+    var n = 2;
+    while (File(candidate).existsSync()) {
+      candidate = p.join(
+        dir,
+        '${p.basenameWithoutExtension(name)} ($n)${p.extension(name)}',
+      );
+      n++;
+    }
+    return candidate;
+  }
+
+  Future<void> _replace(_Job job) async {
+    final clean = job.cleanPath;
+    if (clean == null) return;
+    final source = job.source;
     final strings = ref.read(appStringsProvider);
     try {
       // Copy next to the original, then swap with one rename: a failure halfway
@@ -142,25 +234,32 @@ class _CleanerPageState extends ConsumerState<CleanerPage> {
       final tmp = File('$source.influencor-tmp');
       await File(clean).copy(tmp.path);
       await tmp.rename(source);
+      await StoragePermissionService().scanMedia([source]);
       await _deleteTemp(clean);
       if (!mounted) return;
       _snack(strings.fileReplaced);
-      _setSource(source);
+      setState(() {
+        job.cleanPath = null;
+        job.report = null;
+        job.detailsOpen = false;
+        job.inspection = null;
+      });
+      unawaited(_inspect(job));
     } catch (_) {
       if (mounted) _snack(strings.genericError);
     }
   }
 
-  Future<void> _eraseCleanCopy({bool showSnack = true}) async {
-    final clean = _cleanPath;
+  Future<void> _eraseCleanCopy(_Job job, {bool showSnack = true}) async {
+    final clean = job.cleanPath;
     if (clean == null) return;
     final strings = ref.read(appStringsProvider);
     await _deleteTemp(clean);
     if (!mounted) return;
     setState(() {
-      _cleanPath = null;
-      _cleanResult = null;
-      _detailsOpen = false;
+      job.cleanPath = null;
+      job.report = null;
+      job.detailsOpen = false;
     });
     if (showSnack) _snack(strings.cleanCopyErased);
   }
@@ -194,10 +293,9 @@ class _CleanerPageState extends ConsumerState<CleanerPage> {
   @override
   Widget build(BuildContext context) {
     final strings = ref.watch(appStringsProvider);
-    final source = _sourcePath;
-    final clean = _cleanPath;
-    final cleanResult = _cleanResult;
-    final shown = clean ?? source;
+    final selected = _selected;
+    final pending = _jobs.where((j) => j.report == null).length;
+    final ready = _jobs.where((j) => j.cleanPath != null).length;
 
     return DropTarget(
       key: const ValueKey('deganeo-page'),
@@ -205,13 +303,10 @@ class _CleanerPageState extends ConsumerState<CleanerPage> {
       onDragExited: (_) => setState(() => _dragging = false),
       onDragDone: (detail) {
         setState(() => _dragging = false);
-        final path = detail.files
-            .map((file) => file.path)
-            .where((path) => path.isNotEmpty)
-            .where(_isMediaPath)
-            .cast<String?>()
-            .firstWhere((path) => path != null, orElse: () => null);
-        if (path != null) _setSource(path);
+        _addPaths([
+          for (final file in detail.files)
+            if (file.path.isNotEmpty) file.path,
+        ]);
       },
       child: Stack(
         children: [
@@ -224,79 +319,63 @@ class _CleanerPageState extends ConsumerState<CleanerPage> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    if (shown == null) ...[
-                      _UploadPanel(onPick: _pick),
-                      const SizedBox(height: 12),
-                      _WatermarkNotice(
-                          message: strings.visibleWatermarkNotRemoved),
-                    ] else ...[
-                      _MediaPreview(
-                        path: shown,
-                        cleaning: _cleaning,
-                        cleaned: clean != null,
-                      ),
-                      const SizedBox(height: 16),
-                      if (cleanResult == null)
-                        FilledButton.icon(
-                          onPressed: _cleaning ? null : _clean,
-                          icon: _cleaning
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child:
-                                      CircularProgressIndicator(strokeWidth: 2),
-                                )
-                              : const Icon(Icons.auto_fix_high_outlined),
-                          label: Text(strings.cleanMediaCta),
-                        )
-                      else
-                        Column(
-                          children: [
-                            CleanReportCard(
-                              report: cleanResult,
-                              expanded: _detailsOpen,
-                              onToggle: () => setState(
-                                () => _detailsOpen = !_detailsOpen,
-                              ),
+                    if (_jobs.isEmpty)
+                      _UploadPanel(onPick: _pick)
+                    else ...[
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        spacing: 12,
+                        runSpacing: 12,
+                        children: [
+                          OutlinedButton.icon(
+                            onPressed: _jobs.length >= CleanerPage.maxFiles
+                                ? null
+                                : _pick,
+                            icon:
+                                const Icon(Icons.add_photo_alternate_outlined),
+                            label: Text(
+                              '${strings.addFiles} '
+                              '(${_jobs.length}/${CleanerPage.maxFiles})',
                             ),
-                            const SizedBox(height: 12),
-                            if (clean == null)
-                              OutlinedButton.icon(
-                                onPressed: _pick,
-                                icon: const Icon(Icons.folder_open_outlined),
-                                label: Text(strings.chooseAnotherFile),
-                              )
-                            else
-                              Wrap(
-                                alignment: WrapAlignment.center,
-                                spacing: 12,
-                                runSpacing: 12,
-                                children: [
-                                  FilledButton.icon(
-                                    onPressed: _download,
-                                    icon: const Icon(Icons.download_outlined),
-                                    label: Text(strings.download),
-                                  ),
-                                  OutlinedButton.icon(
-                                    onPressed: _replace,
-                                    icon:
-                                        const Icon(Icons.find_replace_outlined),
-                                    label: Text(strings.replace),
-                                  ),
-                                  OutlinedButton.icon(
-                                    onPressed: () => _eraseCleanCopy(),
-                                    icon:
-                                        const Icon(Icons.delete_sweep_outlined),
-                                    label: Text(strings.eraseCleanCopy),
-                                  ),
-                                ],
-                              ),
-                          ],
-                        ),
+                          ),
+                          if (_jobs.length > 1 && pending > 0)
+                            FilledButton.icon(
+                              onPressed: _busyAll ? null : _cleanAll,
+                              icon: _busyAll
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2),
+                                    )
+                                  : const Icon(Icons.auto_fix_high_outlined),
+                              label: Text('${strings.cleanAll} ($pending)'),
+                            ),
+                          if (ready > 0)
+                            FilledButton.tonalIcon(
+                              onPressed: _downloadAll,
+                              icon: const Icon(Icons.download_outlined),
+                              label: Text('${strings.downloadAll} ($ready)'),
+                            ),
+                        ],
+                      ),
                       const SizedBox(height: 12),
-                      _WatermarkNotice(
-                          message: strings.visibleWatermarkNotRemoved),
+                      for (final job in _jobs)
+                        _JobTile(
+                          job: job,
+                          selected: job == selected,
+                          onTap: () => setState(() => _selected = job),
+                          onRemove: job.cleaning ? null : () => _remove(job),
+                          removeTooltip: strings.removeFromList,
+                        ),
+                      if (selected != null) ...[
+                        const SizedBox(height: 16),
+                        _detail(selected, strings),
+                      ],
                     ],
+                    const SizedBox(height: 12),
+                    _WatermarkNotice(
+                        message: strings.visibleWatermarkNotRemoved),
                   ],
                 ),
               ),
@@ -325,11 +404,153 @@ class _CleanerPageState extends ConsumerState<CleanerPage> {
     );
   }
 
+  Widget _detail(_Job job, AppStrings strings) {
+    final clean = job.cleanPath;
+    final report = job.report;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _MediaPreview(
+          path: clean ?? job.source,
+          cleaning: job.cleaning,
+          cleaned: clean != null,
+        ),
+        const SizedBox(height: 16),
+        if (report == null) ...[
+          if (!job.inspectFailed)
+            MetadataInspectorCard(
+              key: ValueKey(job),
+              findings: job.inspection,
+            ),
+          const SizedBox(height: 12),
+          FilledButton.icon(
+            onPressed: job.cleaning ? null : () => _clean(job),
+            icon: job.cleaning
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.auto_fix_high_outlined),
+            label: Text(strings.cleanMediaCta),
+          ),
+        ] else ...[
+          CleanReportCard(
+            key: ValueKey(job),
+            report: report,
+            expanded: job.detailsOpen,
+            onToggle: () => setState(() => job.detailsOpen = !job.detailsOpen),
+          ),
+          const SizedBox(height: 12),
+          if (clean != null)
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                FilledButton.icon(
+                  onPressed: () => _download(job),
+                  icon: const Icon(Icons.download_outlined),
+                  label: Text(strings.download),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () => _replace(job),
+                  icon: const Icon(Icons.find_replace_outlined),
+                  label: Text(strings.replace),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () => _eraseCleanCopy(job),
+                  icon: const Icon(Icons.delete_sweep_outlined),
+                  label: Text(strings.eraseCleanCopy),
+                ),
+              ],
+            ),
+        ],
+      ],
+    );
+  }
+
   bool _isMediaPath(String path) {
     final kind = kindForFile(path);
     return kind == EntryKind.image ||
         kind == EntryKind.video ||
         isCleanableDocument(path);
+  }
+}
+
+/// A compact row in the queue: thumbnail, name, status, remove button.
+class _JobTile extends StatelessWidget {
+  const _JobTile({
+    required this.job,
+    required this.selected,
+    required this.onTap,
+    required this.onRemove,
+    required this.removeTooltip,
+  });
+
+  final _Job job;
+  final bool selected;
+  final VoidCallback onTap;
+  final VoidCallback? onRemove;
+  final String removeTooltip;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final path = job.cleanPath ?? job.source;
+    final kind = kindForFile(path);
+    final report = job.report;
+    final (statusIcon, statusColor) = job.cleaning
+        ? (Icons.hourglass_top, scheme.primary)
+        : report == null
+            ? (Icons.circle_outlined, scheme.outline)
+            : report.isClean
+                ? (Icons.verified_outlined, scheme.primary)
+                : (Icons.warning_amber_outlined, scheme.error);
+    return Card(
+      margin: const EdgeInsets.only(bottom: 6),
+      color: selected ? scheme.primaryContainer.withValues(alpha: 0.5) : null,
+      child: ListTile(
+        dense: true,
+        selected: selected,
+        onTap: onTap,
+        leading: SizedBox(
+          width: 44,
+          height: 44,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: kind == EntryKind.image && canRenderThumbnail(path)
+                ? Image.file(
+                    File(path),
+                    fit: BoxFit.cover,
+                    cacheWidth: 96,
+                    errorBuilder: (_, __, ___) =>
+                        const Icon(Icons.broken_image_outlined),
+                  )
+                : Icon(
+                    isCleanableDocument(path)
+                        ? Icons.picture_as_pdf_outlined
+                        : kind == EntryKind.video
+                            ? Icons.movie_outlined
+                            : Icons.image_outlined,
+                  ),
+          ),
+        ),
+        title: Text(p.basename(job.source),
+            maxLines: 1, overflow: TextOverflow.ellipsis),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(statusIcon, size: 18, color: statusColor),
+            IconButton(
+              tooltip: removeTooltip,
+              icon: const Icon(Icons.close, size: 18),
+              onPressed: onRemove,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

@@ -1,7 +1,7 @@
 import 'dart:io';
 
-import 'package:clipboard/core/services/storage_permission_service.dart';
-import 'package:clipboard/core/services/workspace_service.dart';
+import 'package:influencor/core/services/storage_permission_service.dart';
+import 'package:influencor/core/services/workspace_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 

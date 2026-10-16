@@ -15,6 +15,15 @@ class StoragePermissionService {
     }
   }
 
+  /// Asks Android to index [paths] in MediaStore (gallery, share pickers).
+  /// Best effort: never throws, no-op off Android.
+  Future<void> scanMedia(List<String> paths) async {
+    if (!Platform.isAndroid || paths.isEmpty) return;
+    try {
+      await _channel.invokeMethod<bool>('scanMedia', {'paths': paths});
+    } catch (_) {}
+  }
+
   Future<bool> requestStorageAccess() async {
     if (!Platform.isAndroid) return true;
     try {

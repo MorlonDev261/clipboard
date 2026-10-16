@@ -56,9 +56,9 @@ class _CleanReportCardState extends ConsumerState<CleanReportCard> {
         ),
     };
 
-    final total = _rows(report.before, strings);
-    final removed = _rows(report.removed, strings);
-    final remaining = _rows(report.remaining, strings);
+    final total = metaRows(report.before, strings);
+    final removed = metaRows(report.removed, strings);
+    final remaining = metaRows(report.remaining, strings);
     final hasTables = total.isNotEmpty || removed.isNotEmpty;
 
     return DecoratedBox(
@@ -147,13 +147,13 @@ class _CleanReportCardState extends ConsumerState<CleanReportCard> {
                       ),
                     ),
                     LayoutBuilder(builder: (context, c) {
-                      final left = _MetaTable(
+                      final left = MetaTable(
                         title: '${strings.cleanTotalHeading} (${total.length})',
                         rows: total,
                         showValues: _showValues,
                         fg: fg,
                       );
-                      final right = _MetaTable(
+                      final right = MetaTable(
                         title:
                             '${strings.cleanRemovedHeading} (${removed.length})',
                         rows: removed,
@@ -179,7 +179,7 @@ class _CleanReportCardState extends ConsumerState<CleanReportCard> {
                   ],
                   if (remaining.isNotEmpty) ...[
                     const SizedBox(height: 8),
-                    _MetaTable(
+                    MetaTable(
                       title:
                           '${strings.cleanRemainingHeading} (${remaining.length})',
                       rows: remaining,
@@ -211,56 +211,57 @@ class _CleanReportCardState extends ConsumerState<CleanReportCard> {
       ),
     );
   }
-
-  /// One row per `name = value`. Findings whose format exposes no values fall
-  /// back to `Category | label · size`. Identical rows are merged.
-  static List<_Row> _rows(List<MetadataFinding> findings, AppStrings strings) {
-    final seen = <String>{};
-    final rows = <_Row>[];
-    void add(String name, String value) {
-      if (seen.add('$name\u0000$value')) rows.add(_Row(name, value));
-    }
-
-    for (final f in findings) {
-      if (f.entries.isNotEmpty) {
-        for (final e in f.entries) {
-          add(e.name, e.value);
-        }
-      } else {
-        add(
-          strings.metadataCategory(f.category),
-          f.bytes > 0 ? '${f.label} · ${_size(f.bytes)}' : f.label,
-        );
-      }
-    }
-    return rows;
-  }
-
-  static String _size(int b) => b < 1024
-      ? '$b B'
-      : b < 1024 * 1024
-          ? '${(b / 1024).toStringAsFixed(1)} KB'
-          : '${(b / (1024 * 1024)).toStringAsFixed(1)} MB';
 }
 
-class _Row {
-  const _Row(this.name, this.value);
+/// One row per `name = value`. Findings whose format exposes no values fall
+/// back to `Category | label · size`. Identical rows are merged.
+List<MetaRow> metaRows(List<MetadataFinding> findings, AppStrings strings) {
+  final seen = <String>{};
+  final rows = <MetaRow>[];
+  void add(String name, String value) {
+    if (seen.add('$name\u0000$value')) rows.add(MetaRow(name, value));
+  }
+
+  for (final f in findings) {
+    if (f.entries.isNotEmpty) {
+      for (final e in f.entries) {
+        add(e.name, e.value);
+      }
+    } else {
+      add(
+        strings.metadataCategory(f.category),
+        f.bytes > 0 ? '${f.label} · ${_size(f.bytes)}' : f.label,
+      );
+    }
+  }
+  return rows;
+}
+
+String _size(int b) => b < 1024
+    ? '$b B'
+    : b < 1024 * 1024
+        ? '${(b / 1024).toStringAsFixed(1)} KB'
+        : '${(b / (1024 * 1024)).toStringAsFixed(1)} MB';
+
+class MetaRow {
+  const MetaRow(this.name, this.value);
 
   final String name;
   final String value;
 }
 
 /// A compact two-column table (field | value) in a small type size.
-class _MetaTable extends StatelessWidget {
-  const _MetaTable({
+class MetaTable extends StatelessWidget {
+  const MetaTable({
     required this.title,
     required this.rows,
     required this.showValues,
     required this.fg,
+    super.key,
   });
 
   final String title;
-  final List<_Row> rows;
+  final List<MetaRow> rows;
   final bool showValues;
   final Color fg;
 

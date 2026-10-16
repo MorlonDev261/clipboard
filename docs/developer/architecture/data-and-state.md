@@ -20,7 +20,11 @@ Les métadonnées sont stockées dans:
 <workspace>/.clipboard/metadata.json
 <workspace>/.clipboard/trash.json
 <workspace>/.clipboard/trash/
+<workspace>/.clipboard/accounting.json
+<workspace>/.clipboard/tasks/<id>.json
 ```
+
+Comptabilité et tâches: voir [accounting-and-tasks.md](./accounting-and-tasks.md).
 
 ## Services et repository
 

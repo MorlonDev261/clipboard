@@ -8,6 +8,7 @@ import '../features/reseller/presentation/reseller_link_handler.dart';
 import 'constants/app_constants.dart';
 import 'router.dart';
 import 'theme/app_theme.dart';
+import 'theme/dialog_sizing.dart';
 
 /// Root application widget.
 class ClipboardApp extends ConsumerWidget {
@@ -31,9 +32,12 @@ class ClipboardApp extends ConsumerWidget {
       themeMode: settings.themeMode,
       locale: materialLocale,
       routerConfig: router,
-      builder: (context, child) => ResellerLinkHandler(
-        router: router,
-        child: child ?? const SizedBox.shrink(),
+      builder: (context, child) => Theme(
+        data: wideDialogTheme(context),
+        child: ResellerLinkHandler(
+          router: router,
+          child: child ?? const SizedBox.shrink(),
+        ),
       ),
       supportedLocales: const [Locale('fr'), Locale('en')],
       localizationsDelegates: const [

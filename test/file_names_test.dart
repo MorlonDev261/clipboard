@@ -1,9 +1,9 @@
 import 'dart:io';
 
-import 'package:clipboard/features/library/data/file_names.dart';
-import 'package:clipboard/features/library/data/library_repository.dart';
-import 'package:clipboard/features/library/data/metadata_store.dart';
-import 'package:clipboard/features/library/data/trash_store.dart';
+import 'package:influencor/features/library/data/file_names.dart';
+import 'package:influencor/features/library/data/library_repository.dart';
+import 'package:influencor/features/library/data/metadata_store.dart';
+import 'package:influencor/features/library/data/trash_store.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 
